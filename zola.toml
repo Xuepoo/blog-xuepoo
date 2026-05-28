@@ -1,0 +1,33 @@
+# Xuepoo's Blog - Zola Configuration
+# https://www.getzola.org/documentation/getting-started/configuration/
+
+base_url = "https://blog.xuepoo.xyz"
+title = "Xuepoo's Blog"
+description = "Xuepoo 的个人技术博客 - 软件工程、Linux、Rust、Python、云计算"
+default_language = "zh"
+compile_sass = true
+build_search_index = true
+generate_feeds = true
+feed_filenames = ["atom.xml"]
+minify_html = true
+
+taxonomies = [
+  { name = "tags", feed = true },
+  { name = "categories", feed = true },
+]
+
+[markdown]
+highlight_code = true
+highlight_theme = "css"
+extra_syntaxes_and_themes = []
+
+[search]
+include_title = true
+include_description = true
+include_path = true
+include_content = true
+
+[extra]
+cdn_base_url = "https://cdn.xuepoo.xyz"
+author = "Xuepoo"
+default_og_image = "/og-default.png"
