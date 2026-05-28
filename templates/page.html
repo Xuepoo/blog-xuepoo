@@ -1,0 +1,35 @@
+{% extends "base.html" %} {% block title %}{{ page.title }} - {{ config.title }}{% endblock title %}
+{% block description %}{{ page.description }}{% endblock description %} {% block content %}
+<article style="margin: 3rem 0">
+  <header style="padding: 0; border-bottom: none; margin-bottom: 2rem">
+    <h1 style="margin-bottom: 0.5rem; line-height: 1.2">{{ page.title }}</h1>
+    <div class="post-meta">
+      <time datetime="{{ page.date | date(format='%Y-%m-%d') }}"
+        >{{ page.date | date(format='%Y 年 %m 月 %d 日') }}</time
+      >
+      {% if page.reading_time %}
+      <span>&middot;</span>
+      <span>阅读时间约 {{ page.reading_time }} 分钟</span>
+      {% endif %}
+    </div>
+  </header>
+
+  <div class="post-content">{{ page.content | safe }}</div>
+
+  <div
+    style="
+      margin-top: 5rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border-color);
+      text-align: center;
+    "
+  >
+    <a
+      href="{{ get_url(path='@/_index.md') }}"
+      style="font-family: var(--font-sans); font-weight: 700; text-decoration: none"
+    >
+      &larr; 返回文章列表
+    </a>
+  </div>
+</article>
+{% endblock content %}

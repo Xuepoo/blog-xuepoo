@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="{% block description %}{{ config.description }}{% endblock description %}"
+    />
+    <title>{% block title %}{{ config.title }}{% endblock title %}</title>
+
+    <link rel="stylesheet" href="{{ get_url(path='style.css') | safe }}" />
+    <link rel="icon" type="image/x-icon" href="{{ get_url(path='favicon.ico') | safe }}" />
+
+    {% block extra_head %}{% endblock extra_head %}
+  </head>
+  <body>
+    <header>
+      <div class="container header-inner">
+        <a href="{{ get_url(path='@/_index.md') }}" class="site-title">Xuepoo's Blog</a>
+        <nav>
+          <a href="https://xuepoo.xyz">Portal</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container" id="content">{% block content %} {% endblock content %}</main>
+
+    <footer>
+      <div class="container">
+        <p>&copy; {{ now() | date(format="%Y") }} Xuepoo. All rights reserved.</p>
+        <div class="footer-nav">
+          <a href="https://github.com/Xuepoo" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://xuepoo.xyz">Portal</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
