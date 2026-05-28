@@ -16,10 +16,8 @@ taxonomies = [
   { name = "categories", feed = true },
 ]
 
-[markdown]
-highlight_code = true
-highlight_theme = "css"
-extra_syntaxes_and_themes = []
+[markdown.highlighting]
+style = "class"
 
 [search]
 include_title = true
