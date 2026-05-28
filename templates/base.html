@@ -9,8 +9,8 @@
     />
     <title>{% block title %}{{ config.title }}{% endblock title %}</title>
 
-    <link rel="stylesheet" href="{{ get_url(path='style.css') | safe }}" />
-    <link rel="icon" type="image/x-icon" href="{{ get_url(path='favicon.ico') | safe }}" />
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
 
     {% block extra_head %}{% endblock extra_head %}
   </head>
