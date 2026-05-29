@@ -9,31 +9,98 @@
     />
     <title>{% block title %}{{ config.title }}{% endblock title %}</title>
 
+    <link rel="stylesheet" href="https://unpkg.com/98.css" />
     <link rel="stylesheet" href="/style.css" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
 
     {% block extra_head %}{% endblock extra_head %}
   </head>
   <body>
-    <header>
-      <div class="container header-inner">
-        <a href="{{ get_url(path='@/_index.md') }}" class="site-title">Xuepoo's Blog</a>
-        <nav>
-          <a href="https://xuepoo.xyz">Portal</a>
-        </nav>
-      </div>
-    </header>
+    <div class="vaporwave-bg"></div>
+    <div class="container window-container">
+      <div class="window" style="width: 100%">
+        <div class="title-bar">
+          <div class="title-bar-text">🌐 Xuepoo's Personal Homepage 🌐</div>
+          <div class="title-bar-controls">
+            <button aria-label="Minimize"></button>
+            <button aria-label="Maximize"></button>
+            <button aria-label="Close"></button>
+          </div>
+        </div>
+        <div class="window-body">
+          <header>
+            <div class="header-inner">
+              <div style="margin-bottom: 1rem">
+                <img
+                  src="/banner.png"
+                  alt="Vaporwave Banner"
+                  style="
+                    width: 100%;
+                    max-height: 200px;
+                    object-fit: cover;
+                    border: 2px solid var(--vapor-pink);
+                  "
+                />
+              </div>
+              <marquee scrollamount="5" class="site-title-marquee">
+                <a href="{{ get_url(path='@/_index.md') }}" class="site-title"
+                  >✨ Xuepoo's Cyber Space ✨</a
+                >
+              </marquee>
+              <nav>
+                <a href="https://xuepoo.xyz" class="button">Return to Portal</a>
+              </nav>
+            </div>
+            <div class="retro-badges">
+              <img src="/images/windows95.gif" alt="Windows 95" />
+              <img src="/images/netscape.gif" alt="Netscape Now" />
+              <img src="/images/ie4.gif" alt="Internet Explorer" />
+              <img src="/images/notepad.gif" alt="Notepad" />
+            </div>
+          </header>
 
-    <main class="container" id="content">{% block content %} {% endblock content %}</main>
+          <div style="text-align: center; margin: 20px 0">
+            <img
+              src="/divider.png"
+              alt="Divider"
+              style="width: 80%; max-height: 50px; object-fit: contain"
+            />
+          </div>
 
-    <footer>
-      <div class="container">
-        <p>&copy; {{ now() | date(format="%Y") }} Xuepoo. All rights reserved.</p>
-        <div class="footer-nav">
-          <a href="https://github.com/Xuepoo" target="_blank" rel="noopener noreferrer">GitHub</a>
-          <a href="https://xuepoo.xyz">Portal</a>
+          <main id="content">
+            <div class="sunken-panel" style="padding: 1rem; margin-top: 1rem">
+              {% block content %} {% endblock content %}
+            </div>
+          </main>
+
+          <div style="text-align: center; margin: 20px 0">
+            <img
+              src="/divider.png"
+              alt="Divider"
+              style="width: 80%; max-height: 50px; object-fit: contain"
+            />
+          </div>
+
+          <footer>
+            <div class="footer-inner">
+              <p>
+                &copy; {{ now() | date(format="%Y") }} Xuepoo. Best viewed in 800x600 resolution.
+              </p>
+              <div class="footer-nav">
+                <a
+                  href="https://github.com/Xuepoo"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="button"
+                  >GitHub</a
+                >
+                <a href="https://xuepoo.xyz" class="button">Portal</a>
+              </div>
+              <img src="/images/netscape.gif" alt="Netscape Now" style="margin-top: 10px" />
+            </div>
+          </footer>
         </div>
       </div>
-    </footer>
+    </div>
   </body>
 </html>
