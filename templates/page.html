@@ -1,12 +1,22 @@
-{% extends "base.html" %}
-
-{% block content %}
-<article class="single-article" style="background:#fff; border:var(--border-double); border-radius:6px; padding:1.5rem; box-shadow:var(--panel-shadow);">
-  <header class="article-header" style="border-bottom:1px dashed var(--cherry-pink); padding-bottom:0.5rem; margin-bottom:1rem;">
-    <h1 class="article-title" style="margin:0; font-family:var(--font-vintage); color:#4a4a4a; font-size:1.8rem;">{{ page.title }}</h1>
-    <div class="article-meta" style="font-size:0.8rem; color:var(--vintage-gray); margin-top:0.3rem;">发表时间: {{ page.date | date(format="%Y-%m-%d") }}</div>
-  </header>
-  <div class="article-body" style="font-family:var(--font-vintage); line-height:1.7; font-size:14px; color:#333;">
+{% extends "base.html" %} {% block content %}
+<article class="nes-container is-rounded with-title" style="background: #fff; padding: 1.5rem">
+  <p class="title" style="font-size: 1.2rem; font-family: var(--font-pixel-cn)">
+    📖 {{ page.title }}
+  </p>
+  <div
+    class="article-meta"
+    style="font-size: 0.8rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center"
+  >
+    <span class="nes-badge" style="display: inline-flex"
+      ><span class="is-error" style="font-family: var(--font-pixel-en)"
+        >{{ page.date | date(format="%Y-%m-%d") }}</span
+      ></span
+    >
+  </div>
+  <div
+    class="article-body nes-text"
+    style="line-height: 1.8; font-size: 1rem; font-family: var(--font-pixel-cn)"
+  >
     {{ page.content | safe }}
   </div>
 </article>
