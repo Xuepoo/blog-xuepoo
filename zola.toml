@@ -31,3 +31,6 @@ include_content = true
 cdn_base_url = "https://cdn.xuepoo.xyz"
 author = "Xuepoo"
 default_og_image = "/og-default.png"
+anime_title = "樱花姬の同人屋"
+anime_subtitle = "Memories & Melodies - 2000s Fan Club"
+custom_cursor_url = "https://cdn.xuepoo.xyz/shared/retro-wand.png"
