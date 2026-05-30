@@ -13,6 +13,7 @@
     <link href="https://unpkg.com/nes.css@2.3.0/css/nes.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="/style.css" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
 
     {% block extra_head %}{% endblock extra_head %}
     <style>
@@ -31,9 +32,43 @@
         color: #92cc41;
         animation: marquee-gamepad 10s linear infinite;
       }
+      /* D-pad and Gamepad Premium Interactive Styling */
+      #btn-dpad-up:active {
+        background-color: rgba(255, 255, 255, 0.25) !important;
+        border-radius: 2px 2px 0 0;
+      }
+      #btn-dpad-down:active {
+        background-color: rgba(255, 255, 255, 0.25) !important;
+        border-radius: 0 0 2px 2px;
+      }
+      #btn-dpad-left:active {
+        background-color: rgba(255, 255, 255, 0.25) !important;
+        border-radius: 2px 0 0 2px;
+      }
+      #btn-dpad-right:active {
+        background-color: rgba(255, 255, 255, 0.25) !important;
+        border-radius: 0 2px 2px 0;
+      }
+      #btn-select:active,
+      #btn-start:active {
+        background-color: #5a6364 !important;
+      }
     </style>
   </head>
   <body>
+    <div
+      id="attractor-canvas-container"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: -1;
+        pointer-events: none;
+        opacity: 0.16;
+      "
+    ></div>
     <!-- Floating sakura falling simulation -->
     <div class="sakura-container" aria-hidden="true">
       <div class="petal" style="image-rendering: pixelated"></div>
@@ -320,20 +355,91 @@
                     border-radius: 50%;
                   "
                 ></div>
+                <!-- Interactive Button overlays -->
+                <button
+                  id="btn-dpad-up"
+                  style="
+                    position: absolute;
+                    top: 0;
+                    left: 22px;
+                    width: 20px;
+                    height: 22px;
+                    background: transparent;
+                    border: none;
+                    cursor: pointer;
+                    padding: 0;
+                    outline: none;
+                  "
+                  title="Increase Rho / Parameter A"
+                ></button>
+                <button
+                  id="btn-dpad-down"
+                  style="
+                    position: absolute;
+                    top: 42px;
+                    left: 22px;
+                    width: 20px;
+                    height: 22px;
+                    background: transparent;
+                    border: none;
+                    cursor: pointer;
+                    padding: 0;
+                    outline: none;
+                  "
+                  title="Decrease Rho / Parameter A"
+                ></button>
+                <button
+                  id="btn-dpad-left"
+                  style="
+                    position: absolute;
+                    top: 22px;
+                    left: 0;
+                    width: 22px;
+                    height: 20px;
+                    background: transparent;
+                    border: none;
+                    cursor: pointer;
+                    padding: 0;
+                    outline: none;
+                  "
+                  title="Decrease Sigma / Parameter D"
+                ></button>
+                <button
+                  id="btn-dpad-right"
+                  style="
+                    position: absolute;
+                    top: 22px;
+                    left: 42px;
+                    width: 22px;
+                    height: 20px;
+                    background: transparent;
+                    border: none;
+                    cursor: pointer;
+                    padding: 0;
+                    outline: none;
+                  "
+                  title="Increase Sigma / Parameter D"
+                ></button>
               </div>
 
               <!-- Select / Start 软条 -->
               <div style="display: flex; gap: 8px">
                 <div style="display: flex; flex-direction: column; align-items: center">
-                  <div
+                  <button
+                    id="btn-select"
                     style="
                       width: 28px;
                       height: 8px;
                       background-color: #7f8c8d;
                       border-radius: 4px;
                       border: 2px solid #212529;
+                      padding: 0;
+                      cursor: pointer;
+                      outline: none;
+                      box-sizing: border-box;
                     "
-                  ></div>
+                    title="Toggle Attractor Equation"
+                  ></button>
                   <span
                     style="
                       font-size: 0.5rem;
@@ -346,15 +452,21 @@
                   >
                 </div>
                 <div style="display: flex; flex-direction: column; align-items: center">
-                  <div
+                  <button
+                    id="btn-start"
                     style="
                       width: 28px;
                       height: 8px;
                       background-color: #7f8c8d;
                       border-radius: 4px;
                       border: 2px solid #212529;
+                      padding: 0;
+                      cursor: pointer;
+                      outline: none;
+                      box-sizing: border-box;
                     "
-                  ></div>
+                    title="Cosmic Big Bang Reset"
+                  ></button>
                   <span
                     style="
                       font-size: 0.5rem;
@@ -372,6 +484,7 @@
               <div style="display: flex; gap: 8px">
                 <div style="display: flex; flex-direction: column; align-items: center">
                   <button
+                    id="btn-action-b"
                     class="nes-btn is-error"
                     style="
                       width: 24px;
@@ -386,6 +499,7 @@
                       font-weight: bold;
                       font-family: var(--font-pixel-en);
                     "
+                    title="Toggle Simulation Pause/Play"
                   >
                     B
                   </button>
@@ -402,6 +516,7 @@
                 </div>
                 <div style="display: flex; flex-direction: column; align-items: center">
                   <button
+                    id="btn-action-a"
                     class="nes-btn is-error"
                     style="
                       width: 24px;
@@ -416,6 +531,7 @@
                       font-weight: bold;
                       font-family: var(--font-pixel-en);
                     "
+                    title="Toggle Simulation Pause/Play"
                   >
                     A
                   </button>
@@ -430,6 +546,85 @@
                     >PLAY</span
                   >
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mathematical Telemetry UI -->
+          <div
+            class="nes-container is-rounded telemetry-widget"
+            style="
+              background-color: #dfdfdf;
+              border: 4px solid var(--fc-black);
+              padding: 0.8rem;
+              margin-top: 1rem;
+            "
+          >
+            <p
+              class="title"
+              style="
+                background-color: var(--fc-crimson);
+                color: #fff;
+                margin: 0 0 0.5rem;
+                font-size: 0.8rem;
+                font-family: var(--font-pixel-cn);
+              "
+            >
+              TELEMETRY PANEL
+            </p>
+            <div
+              class="nes-container is-dark is-rounded"
+              style="
+                padding: 0.6rem;
+                background-color: #120c1f;
+                font-family: var(--font-pixel-cn);
+                font-size: 0.85rem;
+                color: #00f5d4;
+              "
+            >
+              <div
+                style="
+                  font-size: 0.8rem;
+                  border-bottom: 2px dashed #00f5d4;
+                  padding-bottom: 0.2rem;
+                  margin-bottom: 0.6rem;
+                  color: #fff;
+                  text-align: center;
+                "
+              >
+                📟 LORENZ CONSTANTS
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 0.4rem;
+                "
+              >
+                <span style="color: #ff71ce; font-family: monospace">dx/dt = σ*(y-x)</span>
+                <span class="nes-badge" id="telemetry-sigma" style="font-size: 0.75rem"
+                  ><span class="is-success">σ = 10.00</span></span
+                >
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 0.4rem;
+                "
+              >
+                <span style="color: #ff71ce; font-family: monospace">dy/dt = x*(ρ-z)-y</span>
+                <span class="nes-badge" id="telemetry-rho" style="font-size: 0.75rem"
+                  ><span class="is-success">ρ = 28.00</span></span
+                >
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center">
+                <span style="color: #ff71ce; font-family: monospace">dz/dt = x*y-β*z</span>
+                <span class="nes-badge" id="telemetry-beta" style="font-size: 0.75rem"
+                  ><span class="is-success">β = 2.66</span></span
+                >
               </div>
             </div>
           </div>
@@ -509,5 +704,220 @@
         </div>
       </footer>
     </div>
+
+    <!-- p5.js Lorenz/Aizawa Attractor Engine -->
+    <script>
+      // Attractor Physics System Parameters
+      let sigma = 10.0;
+      let rho = 28.0;
+      let beta = 2.66; // 8/3
+      let dt = 0.005;
+
+      let a = 0.95;
+      let b = 0.7;
+      let c = 0.6;
+      let d = 3.5;
+      let e = 0.25;
+      let f = 0.1;
+
+      let attractorType = "lorenz"; // 'lorenz' or 'aizawa'
+      let isPaused = false;
+
+      let x = 0.1,
+        y = 0,
+        z = 0;
+      let points = [];
+      const maxPoints = 1000;
+
+      function setup() {
+        let container = document.getElementById("attractor-canvas-container");
+        if (!container) return;
+        let canvas = createCanvas(container.clientWidth, container.clientHeight, WEBGL);
+        canvas.parent("attractor-canvas-container");
+        background(15, 15, 27);
+      }
+
+      function draw() {
+        if (isPaused) return;
+
+        // Semi-transparent dark background for tracing trail
+        background(15, 15, 27, 20);
+
+        if (attractorType === "lorenz") {
+          // Calculate next Lorenz Attractor state
+          let dx = sigma * (y - x) * dt;
+          let dy = (x * (rho - z) - y) * dt;
+          let dz = (x * y - beta * z) * dt;
+
+          x += dx;
+          y += dy;
+          z += dz;
+        } else {
+          // Calculate next Aizawa Attractor state
+          let dx = ((z - b) * x - d * y) * dt;
+          let dy = (d * x + (z - b) * y) * dt;
+          let dz =
+            (c + a * z - (z * z * z) / 3 - (x * x + y * y) * (1 + e * z) + f * z * (x * x * x)) *
+            dt;
+
+          x += dx;
+          y += dy;
+          z += dz;
+        }
+
+        points.push(createVector(x, y, z));
+        if (points.length > maxPoints) {
+          points.shift();
+        }
+
+        // Elegant 3D camera rotation
+        rotateX(frameCount * 0.003);
+        rotateY(frameCount * 0.004);
+
+        if (attractorType === "lorenz") {
+          scale(4.8);
+          stroke(0, 245, 210, 180); // Cyan glow
+        } else {
+          scale(80);
+          stroke(255, 113, 206, 180); // Purple/pink glow
+        }
+
+        noFill();
+        strokeWeight(1.2);
+
+        beginShape();
+        for (let p of points) {
+          vertex(p.x, p.y, p.z);
+        }
+        endShape();
+      }
+
+      function windowResized() {
+        let container = document.getElementById("attractor-canvas-container");
+        if (container) {
+          resizeCanvas(container.clientWidth, container.clientHeight);
+        }
+      }
+
+      function updateTelemetryUI() {
+        const container = document.querySelector(".telemetry-widget .is-dark");
+        if (!container) return;
+
+        if (attractorType === "lorenz") {
+          container.innerHTML = `
+            <div style="font-size: 0.8rem; border-bottom: 2px dashed #00f5d4; padding-bottom: 0.2rem; margin-bottom: 0.6rem; color: #fff; text-align: center;">📟 LORENZ CONSTANTS</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+              <span style="color: #ff71ce; font-family: monospace;">dx/dt = σ*(y-x)</span>
+              <span class="nes-badge" id="telemetry-sigma" style="font-size: 0.75rem;"><span class="is-success">σ = ${sigma.toFixed(2)}</span></span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+              <span style="color: #ff71ce; font-family: monospace;">dy/dt = x*(ρ-z)-y</span>
+              <span class="nes-badge" id="telemetry-rho" style="font-size: 0.75rem;"><span class="is-success">ρ = ${rho.toFixed(2)}</span></span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="color: #ff71ce; font-family: monospace;">dz/dt = x*y-β*z</span>
+              <span class="nes-badge" id="telemetry-beta" style="font-size: 0.75rem;"><span class="is-success">β = ${beta.toFixed(2)}</span></span>
+            </div>
+          `;
+        } else {
+          container.innerHTML = `
+            <div style="font-size: 0.8rem; border-bottom: 2px dashed #ff71ce; padding-bottom: 0.2rem; margin-bottom: 0.6rem; color: #fff; text-align: center;">📟 AIZAWA CONSTANTS</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+              <span style="color: #00f5d4; font-family: monospace;">dx/dt = (z-b)*x - d*y</span>
+              <span class="nes-badge" id="telemetry-aizawa-a" style="font-size: 0.75rem;"><span class="is-success">a = ${a.toFixed(2)}</span></span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+              <span style="color: #00f5d4; font-family: monospace;">dy/dt = d*x + (z-b)*y</span>
+              <span class="nes-badge" id="telemetry-aizawa-d" style="font-size: 0.75rem;"><span class="is-success">d = ${d.toFixed(2)}</span></span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="color: #00f5d4; font-family: monospace;">dz/dt = c+a*z-z³/3...</span>
+              <span class="nes-badge" id="telemetry-aizawa-status" style="font-size: 0.75rem;"><span class="is-success">ACTIVE</span></span>
+            </div>
+          `;
+        }
+      }
+
+      function resetAttractorParticles() {
+        x = 0.1;
+        y = 0;
+        z = 0;
+        points = [];
+      }
+
+      // Event listeners mapping NES Gamepad actions to Attractor physical constants
+      document.getElementById("btn-dpad-left")?.addEventListener("click", () => {
+        if (attractorType === "lorenz") {
+          sigma -= 0.5;
+        } else {
+          d -= 0.1;
+        }
+        updateTelemetryUI();
+      });
+
+      document.getElementById("btn-dpad-right")?.addEventListener("click", () => {
+        if (attractorType === "lorenz") {
+          sigma += 0.5;
+        } else {
+          d += 0.1;
+        }
+        updateTelemetryUI();
+      });
+
+      document.getElementById("btn-dpad-up")?.addEventListener("click", () => {
+        if (attractorType === "lorenz") {
+          rho += 1.0;
+        } else {
+          a += 0.05;
+        }
+        updateTelemetryUI();
+      });
+
+      document.getElementById("btn-dpad-down")?.addEventListener("click", () => {
+        if (attractorType === "lorenz") {
+          rho -= 1.0;
+        } else {
+          a -= 0.05;
+        }
+        updateTelemetryUI();
+      });
+
+      function togglePlayPause() {
+        isPaused = !isPaused;
+        if (isPaused) {
+          noLoop();
+        } else {
+          loop();
+        }
+      }
+
+      document.getElementById("btn-action-a")?.addEventListener("click", (e) => {
+        e.preventDefault();
+        togglePlayPause();
+      });
+
+      document.getElementById("btn-action-b")?.addEventListener("click", (e) => {
+        e.preventDefault();
+        togglePlayPause();
+      });
+
+      document.getElementById("btn-start")?.addEventListener("click", (e) => {
+        e.preventDefault();
+        // Big Bang Cosmic Reset
+        sigma = 10.0;
+        rho = 28.0;
+        a = 0.95;
+        d = 3.5;
+        resetAttractorParticles();
+        updateTelemetryUI();
+      });
+
+      document.getElementById("btn-select")?.addEventListener("click", (e) => {
+        e.preventDefault();
+        attractorType = attractorType === "lorenz" ? "aizawa" : "lorenz";
+        resetAttractorParticles();
+        updateTelemetryUI();
+      });
+    </script>
   </body>
 </html>
