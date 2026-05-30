@@ -1,31 +1,19 @@
-{% extends "base.html" %} {% block content %}
-<section>
-  <ul class="post-list">
-    {% set section = get_section(path="posts/_index.md") %} {% for page in section.pages %}
-    <li class="post-item">
-      <h2><a href="{{ page.permalink | safe }}">{{ page.title }}</a></h2>
-      <div class="post-meta">
-        <time datetime="{{ page.date | date(format='%Y-%m-%d') }}"
-          >{{ page.date | date(format='%Y 年 %m 月 %d 日') }}</time
-        >
-        {% if page.reading_time %}
-        <span>&middot;</span>
-        <span>阅读时间约 {{ page.reading_time }} 分钟</span>
-        {% endif %}
-      </div>
-      {% if page.summary %}
-      <p class="post-summary">{{ page.summary | safe }}</p>
-      {% elif page.description %}
-      <p class="post-summary">{{ page.description }}</p>
-      {% endif %}
-    </li>
+{% extends "base.html" %}
+
+{% block content %}
+<div class="blog-posts-grid">
+  {% for page in section.pages %}
+  <article class="post-card">
+    <header>
+      <a href="{{ page.permalink }}" class="post-title-link">{{ page.title }}</a>
+      <div class="post-meta">发表时间: {{ page.date | date(format="%Y-%m-%d") }}</div>
+    </header>
+    {% if page.summary %}
+    <div class="post-summary">{{ page.summary | safe }}</div>
     {% else %}
-    <li class="post-item">
-      <p style="text-align: center; color: var(--text-secondary); margin: 4rem 0">
-        暂无技术文章发布。
-      </p>
-    </li>
-    {% endfor %}
-  </ul>
-</section>
+    <div class="post-summary">{{ page.description }}</div>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
 {% endblock content %}
