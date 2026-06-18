@@ -1,6 +1,7 @@
 {% extends "base.html" %} {% block content %}
 <div class="zen-post-list">
-  {% for page in section.pages %}
+  {% if paginator %} {% set pages = paginator.pages %} {% else %} {% set pages = section.pages %} {%
+  endif %} {% for page in pages %}
   <article class="zen-post-item">
     <h2>
       <a href="{{ page.permalink }}">{{ page.title }}</a>
@@ -17,6 +18,19 @@
       <a href="{{ page.permalink }}" class="read-more-link">阅读全文 &rarr;</a>
     </div>
   </article>
-  {% endfor %}
+  {% endfor %} {% if paginator and (paginator.previous or paginator.next) %}
+  <nav class="zen-post-nav" style="margin-top: 5rem">
+    <div class="nav-prev">
+      {% if paginator.previous %}
+      <a href="{{ paginator.previous }}">&larr; 上一页</a>
+      {% endif %}
+    </div>
+    <div class="nav-next">
+      {% if paginator.next %}
+      <a href="{{ paginator.next }}">下一页 &rarr;</a>
+      {% endif %}
+    </div>
+  </nav>
+  {% endif %}
 </div>
 {% endblock content %}
