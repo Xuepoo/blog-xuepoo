@@ -422,10 +422,11 @@ function getEditorHtml() {
       transition: width 0.25s cubic-bezier(0.25, 1, 0.5, 1), margin-left 0.25s cubic-bezier(0.25, 1, 0.5, 1);
       box-sizing: border-box;
       z-index: 10;
+      overflow: hidden;
     }
     #sidebar.collapsed {
-      width: 0;
       margin-left: -280px;
+      border-right: none;
     }
 
     .sidebar-header {
