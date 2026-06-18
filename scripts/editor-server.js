@@ -1626,8 +1626,12 @@ function getEditorHtml() {
           if (foundLine !== -1) {
             doc.replaceRange(finalMarkdown, { line: foundLine, ch: foundCh }, { line: foundLine, ch: foundCh + placeholder.length });
           } else {
+            const scrollInfo = cm.getScrollInfo();
+            const cursor = doc.getCursor();
             const content = doc.getValue();
             doc.setValue(content.replace(placeholder, finalMarkdown));
+            doc.setCursor(cursor);
+            cm.scrollTo(scrollInfo.left, scrollInfo.top);
           }
 
           activePostBody = easyMde.value();
@@ -1660,8 +1664,12 @@ function getEditorHtml() {
           if (foundLine !== -1) {
             doc.replaceRange("", { line: foundLine, ch: foundCh }, { line: foundLine, ch: foundCh + placeholder.length });
           } else {
+            const scrollInfo = cm.getScrollInfo();
+            const cursor = doc.getCursor();
             const content = doc.getValue();
             doc.setValue(content.replace(placeholder, ''));
+            doc.setCursor(cursor);
+            cm.scrollTo(scrollInfo.left, scrollInfo.top);
           }
         }
       } catch (err) {
@@ -1684,8 +1692,12 @@ function getEditorHtml() {
         if (foundLine !== -1) {
           doc.replaceRange("", { line: foundLine, ch: foundCh }, { line: foundLine, ch: foundCh + placeholder.length });
         } else {
+          const scrollInfo = cm.getScrollInfo();
+          const cursor = doc.getCursor();
           const content = doc.getValue();
           doc.setValue(content.replace(placeholder, ''));
+          doc.setCursor(cursor);
+          cm.scrollTo(scrollInfo.left, scrollInfo.top);
         }
       }
     }
