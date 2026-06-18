@@ -2,8 +2,7 @@
 title: "GitHub Actions 使用自托管的 Runner"
 description: "探讨如何为 GitHub Actions 配置与使用 Self-Hosted Runner（自托管运行器），包括安全考量、安装步骤以及在私有仓库和企业级项目中的最佳实践。"
 date: "2026-06-18"
-taxonomies:
-  tags:
+tags:
     - CI-CD
     - GitHub
     - Linux

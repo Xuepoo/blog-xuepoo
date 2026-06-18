@@ -2,8 +2,7 @@
 title: "Hello World — 开启静水深流的技术之旅"
 description: "本站的第一篇文章。探讨为何构建这套基于 Zola 与 Cloudflare Pages 的多站点个人矩阵系统，以及未来的写作规划。"
 date: "2026-05-28"
-taxonomies:
-  tags:
+tags:
     - Personal
     - Zola
     - Cloudflare

@@ -1,10 +1,7 @@
 ---
 title: "{{title}}"
 description: ""
-date: {{date}}
-taxonomies:
-  tags:
-    -
-  categories:
-    -
+date:
+  "{ date }":
+tags:
 ---
