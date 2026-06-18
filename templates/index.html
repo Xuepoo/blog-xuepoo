@@ -15,9 +15,9 @@
       {% endfor %} {% endif %}
     </div>
     <div class="zen-post-summary">
-      {% if page.summary %} {{ page.summary | replace(from="src=\"static/assets/",
-      to="src=\"/assets/") | replace(from="href=\"static/assets/", to="href=\"/assets/") | safe }}
-      {% else %} {{ page.description }} {% endif %}
+      {% if page.summary %} {{ page.summary | replace(from='src="static/assets/',
+      to='src="/assets/') | replace(from='href="static/assets/', to='href="/assets/') | safe }} {%
+      else %} {{ page.description }} {% endif %}
     </div>
     <div style="margin-top: 1.5rem">
       <a href="{{ page.permalink }}" class="read-more-link">阅读全文 &rarr;</a>

@@ -39,8 +39,8 @@
     {% endif %}
 
     <div class="zen-article-body">
-      {{ page.content | replace(from="src=\"static/assets/", to="src=\"/assets/") |
-      replace(from="href=\"static/assets/", to="href=\"/assets/") | safe }}
+      {{ page.content | replace(from='src="static/assets/', to='src="/assets/') |
+      replace(from='href="static/assets/', to='href="/assets/') | safe }}
     </div>
 
     {% if page.later or page.earlier %}
