@@ -9,33 +9,24 @@
 
 ## 1. 日常维护与本地开发
 
-### 本地调试
-
-进入博客目录并启动本地 Zola 开发服务器（默认支持热重载，运行于端口 `8085`）：
+进入博客目录并启动本地开发环境（Zola 热重载预览与本地网页编辑器 API）：
 
 ```bash
-zola serve -p 8085
+just edit
 ```
 
-访问 `http://localhost:8085` 即可实时预览。
-
-### 本地构建
-
-手动生成静态文件（输出至 `public/` 目录）：
-
-```bash
-zola build
-```
+* 该命令会自动启动本地 Zola 开发服务器（预览端口 `8085`）与轻量级 Node.js API 服务器（端口 `8086`）。
+* 访问 `http://localhost:8085` 即可实时预览站点。
+* 访问 `http://localhost:8086` 即可打开本地网页端 Blog 编辑器直接编辑、创建文章和上传临时图片。
 
 ---
 
 ## 2. 编写与发布文章
 
-所有博客文章存储在 `content/posts/` 目录下。
+### 编写文章
 
-### 创建文章
-
-新建一个以 `.md` 结尾的 Markdown 文件（例如 `content/posts/my-new-post.md`），头部必须配置 TOML 格式的 Frontmatter：
+1. 可以直接在网页端编辑器（`http://localhost:8086`）中可视化创建、编辑文章和上传图片。
+2. 也可以手动在 `content/posts/` 目录下新建 Markdown 文件（如 `content/posts/my-new-post.md`），配置 Frontmatter：
 
 ```toml
 +++
@@ -47,31 +38,39 @@ tags = ["CI-CD", "Linux", "Rust"]
 +++
 ```
 
-正文直接在元数据下方使用标准 Markdown 编写。系统会自动解析生成目录（TOC）、代码高亮与字数统计。
+### 部署发布
 
-### 直接部署发布
+项目已配置统一的 **Just 本地自动化发布流程**：
 
-因为移除了 GitHub Actions 自动部署（避免消耗 Private 仓库构建时间额度），现统一采用**本地直接部署**方式。
+1. **检查状态**（可选）：
 
-在文章编写预览完成后，直接在项目根目录下执行部署脚本：
+   ```bash
+   just status
+   ```
 
-```bash
-./deploy.sh
-```
+   检查是否有尚未优化的本地图片。
 
-该脚本会自动执行：
+2. **本地测试与部署**：
 
-1. `pre-commit` 静态质量与排版检查。
-2. `zola build` 生产环境静态页面编译。
-3. `wrangler pages deploy` 直接将 `public/` 静态文件发布到 Cloudflare Pages。
+   ```bash
+   just deploy
+   ```
 
-部署成功后，使用常规 git 命令将代码源文件推送备份到 GitHub 即可：
+   该任务会自动执行：
 
-```bash
-git add .
-git commit -m "feat(blog): publish my new post"
-git push
-```
+   * 运行 `pre-commit` 静态质量与排版检查。
+   * 自动扫描文章中的本地临时图片，压缩并转换为 WebP，上传至 Cloudflare R2，然后重写文章中的图片链接为 CDN URL。
+   * `zola build` 生产环境静态页面编译。
+   * `wrangler pages deploy` 直接将 `public/` 静态文件发布到 Cloudflare Pages。
+
+3. **备份源码**：
+
+   部署成功后，使用 `just commit` 和 `just push` 把源码同步到 GitHub：
+
+   ```bash
+   just commit "feat(blog): publish my new post"
+   just push
+   ```
 
 ---
 
