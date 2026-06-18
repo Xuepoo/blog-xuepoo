@@ -1,24 +1,27 @@
 # Xuepoo's Blog
 
-Personal technical blog built with [Zola](https://www.getzola.org/) and deployed on [Cloudflare Pages](https://pages.cloudflare.com/).
+个人技术博客站点，基于 [Zola](https://www.getzola.org/) 构建，托管于 [Cloudflare Pages](https://pages.cloudflare.com/)。
 
-**Live site:** [blog.xuepoo.xyz](https://blog.xuepoo.xyz)
-
-This site is styled with a **Minimalist Zen (极简禅意)** theme, optimized for deep reading, print-like typography, and zero-JS performance.
+* **线上地址**：[blog.xuepoo.xyz](https://blog.xuepoo.xyz)
+* **主题设计**：极简禅意温润米黄（Cream Zen）排版风格，无 JS 加载（搜索功能除外），为深度技术阅读设计。
 
 ---
 
-## Development
+## 1. 日常维护与本地开发
 
-To run the blog locally with auto-rebuild and live-reload on port `8083`, run:
+### 本地调试
+
+进入博客目录并启动本地 Zola 开发服务器（默认支持热重载，运行于端口 `8085`）：
 
 ```bash
-zola serve -p 8083
+zola serve -p 8085
 ```
 
-Access the site at `http://localhost:8083`.
+访问 `http://localhost:8085` 即可实时预览。
 
-To build for production manually:
+### 本地构建
+
+手动生成静态文件（输出至 `public/` 目录）：
 
 ```bash
 zola build
@@ -26,78 +29,83 @@ zola build
 
 ---
 
-## Writing a New Post
+## 2. 编写与发布文章
 
-All blog posts are stored under the [content/posts/](file:///mnt/data/Workspace/Projects/xuepoo/xuepoo-blog/content/posts) directory.
+所有博客文章存储在 `content/posts/` 目录下。
 
-### 1. Create a Markdown File
+### 创建文章
 
-Create a new markdown file named `your-post-title.md` under `content/posts/`.
-
-### 2. Add TOML Frontmatter
-
-At the very top of your markdown file, add TOML metadata wrapped between `+++` lines:
+新建一个以 `.md` 结尾的 Markdown 文件（例如 `content/posts/my-new-post.md`），头部必须配置 TOML 格式的 Frontmatter：
 
 ```toml
 +++
-title = "Your Blog Post Title"
-description = "A concise, 1-2 sentence description of the post."
+title = "这是你的文章标题"
+description = "简短的 1-2 句文章摘要，用于 SEO 及列表展示。"
 date = 2026-06-18
 [taxonomies]
-tags = ["Rust", "WebAssembly", "Frontend"]
+tags = ["CI-CD", "Linux", "Rust"]
 +++
 ```
 
-### 3. Write Markdown Content
+正文直接在元数据下方使用标准 Markdown 编写。系统会自动解析生成目录（TOC）、代码高亮与字数统计。
 
-Below the frontmatter, write your post using standard Markdown syntax. The system automatically styles headers, images, blockquotes, and code blocks:
+### 提交前质量检查 (Quality Gate)
+
+本项目配置了极严的代码规范与排版校验。每次提交前，必须运行 `pre-commit` 来确保代码格式化及排版合格：
+
+```bash
+pre-commit run --all-files
+```
+
+校验通过后，使用常规 git 命令提交并推送：
+
+```bash
+git add .
+git commit -m "feat(blog): publish my new post"
+git push
+```
+
+推送至 `main` 分支后，GitHub Actions 管道会自动编译并部署至 Cloudflare Pages。
+
+---
+
+## 3. 文章图片与静态资源工作流
+
+为了防止 Git 仓库因图片等大二进制文件而膨胀，同时保障极致的 CDN 加载速度，建议将文章图片存储在 **Cloudflare R2** 桶中，并通过 `https://cdn.xuepoo.xyz` 进行服务。
+
+父级目录的 `scripts/` 中内置了自动化的图片处理流水线，能一键完成 **图片压缩为 WebP** ➔ **上传至 R2 存储桶** ➔ **生成 Markdown 链接**。
+
+### 使用方法
+
+1. 将你需要插入文章的原始图片（`.png`、`.jpg` 等）收集在一个本地临时文件夹中（如 `/tmp/raw/`）。
+1. 在项目根目录下，运行同步脚本（需要确保本地配置了 `wrangler` 凭证）：
+
+```bash
+# 格式: ../scripts/sync-assets.sh <本地临时目录> <R2 路径前缀> [WebP 压缩质量] [R2 桶名称]
+../scripts/sync-assets.sh /tmp/raw blog/posts/github-actions-runner 85 cdn-xuepoo-xyz
+```
+
+1. 脚本运行完成后，控制台将输出如下格式的 Markdown 链接，直接复制粘贴到你的 Markdown 页面正文中即可：
 
 ```markdown
-## Section Header
-
-This is a paragraph with **bold** and *italic* text.
-
-### Code Syntax Highlighting
-
-Syntax highlighting is automatically applied:
-
-\```rust
-fn main() {
-    println!("Hello, Zen Blog!");
-}
-\```
+![my-illustration-1](https://cdn.xuepoo.xyz/blog/posts/github-actions-runner/my-illustration-1.webp)
 ```
 
 ---
 
-## Site Customization
+## 4. 目录结构
 
-Site metadata and extra links are configured in [zola.toml](file:///mnt/data/Workspace/Projects/xuepoo/xuepoo-blog/zola.toml).
-
-### Standard Configuration
-
-- `title`: The name of your blog.
-- `description`: Used for SEO meta tags.
-- `default_language`: Defaults to `"zh"`.
-- `minify_html`: Compresses compiled output for speed.
-
-### Custom Extra Properties
-
-You can customize theme details under the `[extra]` section:
-
-```toml
-[extra]
-cdn_base_url = "https://cdn.xuepoo.xyz"
-author = "Xuepoo"
-anime_title = "薛璞の红白机大厅"
-anime_subtitle = "Stage 1-1: Welcome to NES Retro World"
-custom_cursor_url = "https://cdn.xuepoo.xyz/shared/retro-wand.png"
+```text
+.
+├── PRODUCT.md                  # 设计系统上下文与 Impeccable 核心方针
+├── content/                    # 博客内容源文件
+│   └── posts/                  # 文章 Markdown 目录
+├── static/                     # 静态资源 (CSS、图标、字体等)
+│   ├── css/page.css            # 极简米黄主题核心样式
+│   └── giallo-light.css        # 代码高亮语法配色
+├── templates/                  # 站点 Tera 模板
+│   ├── base.html               # 骨架页面与前端检索逻辑
+│   ├── index.html              # 首页列表页模板
+│   └── page.html               # 文章详情页及 TOC 交互
+└── zola.toml                   # Zola 全局配置文件
 ```
-
-## Deployment
-
-Automated via GitHub Actions on push to `main`. Deploys to Cloudflare Pages.
-
-## License
-
-All content is © Xuepoo. All rights reserved.
