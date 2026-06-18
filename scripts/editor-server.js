@@ -388,7 +388,21 @@ const server = http.createServer((req, res) => {
     }
   } else if (req.url === "/api/images" && req.method === "POST") {
     let chunks = [];
-    const filename = req.headers["x-filename"] || `image-${Date.now()}.png`;
+    let filename = req.headers["x-filename"] || `image-${Date.now()}.png`;
+
+    // Make filename unique to prevent overwritten pasted images
+    const ext = path.extname(filename) || ".png";
+    const base = path.basename(filename, ext);
+    if (
+      base.toLowerCase() === "image" ||
+      base.toLowerCase() === "blob" ||
+      base.toLowerCase().startsWith("pasted-image")
+    ) {
+      filename = `pasted-${Date.now()}-${Math.random().toString(36).substring(2, 8)}${ext}`;
+    } else {
+      filename = `${base}-${Date.now()}${ext}`;
+    }
+
     req.on("data", (chunk) => {
       chunks.push(chunk);
     });
