@@ -1101,7 +1101,7 @@ function getEditorHtml() {
         const posts = await res.json();
         const container = document.getElementById('post-list');
         container.innerHTML = posts.map(function(p) {
-          return '<div class="post-item ' + (activePost === p.filename ? 'active' : '') + '" onclick="selectPost(\\' + p.filename + \\')">' +
+          return '<div class="post-item ' + (activePost === p.filename ? 'active' : '') + '" onclick="selectPost(&apos;' + p.filename + '&apos;)">' +
             '<strong style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + p.title + '</strong>' +
             '<div style="font-size:0.75rem;color:#857a70;margin-top:0.25rem;">📅 ' + p.date + '</div>' +
           '</div>';
