@@ -8,10 +8,14 @@ let uncompressedCount = 0;
 
 files.forEach((file) => {
   const content = fs.readFileSync(path.join(POSTS_DIR, file), "utf-8");
-  const tempImageRegex = /\/tmp\/raw\/images\/[^\s)]+/g;
-  const matches = content.match(tempImageRegex);
+  const tempImageRegex = /(?:\.\.\/\.\.\/static|\/static|)\/tmp\/raw\/images\/([^\s"'>)]+)/g;
+  let match;
+  let matches = [];
+  while ((match = tempImageRegex.exec(content)) !== null) {
+    matches.push(match[0]);
+  }
 
-  if (matches) {
+  if (matches.length > 0) {
     console.log(`File: ${file} contains uncompressed images:`);
     matches.forEach((m) => {
       console.log(`  - ${m}`);

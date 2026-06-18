@@ -12,12 +12,12 @@ const files = fs.readdirSync(POSTS_DIR).filter((f) => f.endsWith(".md"));
 files.forEach((file) => {
   const filePath = path.join(POSTS_DIR, file);
   let content = fs.readFileSync(filePath, "utf-8");
-  const tempImageRegex = /\/tmp\/raw\/images\/([^\s)]+)/g;
+  const tempImageRegex = /(?:\.\.\/\.\.\/static|\/static|)\/tmp\/raw\/images\/([^\s"'>)]+)/g;
   let match;
   let matches = [];
 
   while ((match = tempImageRegex.exec(content)) !== null) {
-    matches.push(match[1]);
+    matches.push({ fullMatch: match[0], imgName: match[1] });
   }
 
   if (matches.length > 0) {
@@ -26,7 +26,7 @@ files.forEach((file) => {
     let updatedContent = content;
     let hasFailed = false;
 
-    matches.forEach((imgName) => {
+    matches.forEach(({ fullMatch, imgName }) => {
       const imgLocalPath = path.join(__dirname, "../static/tmp/raw/images", imgName);
       if (!fs.existsSync(imgLocalPath)) {
         console.warn(`Local file ${imgLocalPath} not found!`);
@@ -48,7 +48,7 @@ files.forEach((file) => {
         // Rewrite Markdown link in content
         const baseNameWithoutExt = path.parse(imgName).name;
         const newUrl = `https://cdn.xuepoo.xyz/${r2Prefix}/${baseNameWithoutExt}.webp`;
-        const oldRef = `/tmp/raw/images/${imgName}`;
+        const oldRef = fullMatch;
 
         updatedContent = updatedContent.split(oldRef).join(newUrl);
         console.log(`Prepared link update: ${oldRef} -> ${newUrl}`);
