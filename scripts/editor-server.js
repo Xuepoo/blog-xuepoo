@@ -740,23 +740,39 @@ function getEditorHtml() {
       overflow: hidden;
       display: none;
     }
-    .typora-body-view.live-rendering-split {
-      border-top: 1px dashed #e0dcd3;
-      margin-top: 2.5rem;
-      padding-top: 2rem;
+    .typora-block {
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 6px 12px;
+      margin: 4px 0;
       position: relative;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+      cursor: text;
     }
-    .typora-body-view.live-rendering-split::before {
-      content: "Instant Typing Preview";
-      position: absolute;
-      top: -10px;
-      left: 10px;
-      background: #fcfbfa;
-      padding: 0 10px;
-      font-size: 0.75rem;
-      color: #857a70;
-      font-weight: 600;
-      letter-spacing: 0.05em;
+    .typora-block:hover {
+      background-color: rgba(240, 237, 230, 0.35);
+      border-color: rgba(224, 220, 211, 0.6);
+    }
+    .typora-block.editing {
+      background-color: rgba(240, 237, 230, 0.45);
+      border-color: #c9c3b5;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.02);
+    }
+    .typora-block-editor {
+      width: 100%;
+      min-height: 40px;
+      font-family: inherit;
+      font-size: inherit;
+      line-height: inherit;
+      color: inherit;
+      background: transparent;
+      border: none;
+      resize: none;
+      outline: none;
+      padding: 0;
+      box-sizing: border-box;
+      overflow: hidden;
+      display: none;
     }
 
     .tip-text {
@@ -908,6 +924,8 @@ function getEditorHtml() {
     let activePostBody = "";
     let isSidebarCollapsed = false;
     let activeView = "typora";
+    let articleBlocks = [];
+    let activeEditingIndex = null;
 
     marked.setOptions({
       breaks: true,
@@ -956,8 +974,8 @@ function getEditorHtml() {
       else if (viewName === 'preview') tabIdx = 3;
       tabs[tabIdx].classList.add('active');
 
-      if (document.getElementById('typora-body-editor').style.display === 'block') {
-        exitTyporaBodyEdit();
+      if (activeEditingIndex !== null) {
+        exitBlockEdit(activeEditingIndex);
       }
 
       const panes = document.querySelectorAll('.view-pane');
@@ -1069,8 +1087,8 @@ function getEditorHtml() {
       if (!activePost) return alert('No active article selected.');
 
       if (activeView === 'typora') {
-        if (document.getElementById('typora-body-editor').style.display === 'block') {
-          exitTyporaBodyEdit();
+        if (activeEditingIndex !== null) {
+          exitBlockEdit(activeEditingIndex);
         }
         syncMetadataFieldsToRaw();
       } else if (activeView === 'split') {
@@ -1236,13 +1254,75 @@ function getEditorHtml() {
 
     // --- Typora Mode Interactions ---
 
+    function autoResizeTextarea(textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = (textarea.scrollHeight + 50) + 'px';
+    }
+
+    function splitMarkdownToBlocks(md) {
+      if (!md) return [];
+      const lines = md.split('\\n');
+      const blocks = [];
+      let currentBlock = [];
+      let inCodeBlock = false;
+      let inMathBlock = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        if (line.trim().startsWith('\`\`\`')) {
+          inCodeBlock = !inCodeBlock;
+        }
+        if (line.trim().startsWith('$$') && !inCodeBlock) {
+          inMathBlock = !inMathBlock;
+        }
+
+        if (!inCodeBlock && !inMathBlock && line.trim() === '') {
+          if (currentBlock.length > 0) {
+            blocks.push(currentBlock.join('\\n'));
+            currentBlock = [];
+          }
+        } else {
+          currentBlock.push(line);
+        }
+      }
+
+      if (currentBlock.length > 0) {
+        blocks.push(currentBlock.join('\\n'));
+      }
+
+      return blocks.filter(b => b.trim() !== '');
+    }
+
     function renderTyporaBodyHtml(bodyText) {
       const bodyView = document.getElementById('typora-body-view');
-      if (!bodyText || bodyText.trim() === "") {
-        bodyView.innerHTML = '<div style="color:#857a70;font-style:italic;text-align:center;padding:3rem 0;">No content. Click here to write markdown...</div>';
-      } else {
-        bodyView.innerHTML = marked.parse(bodyText);
+
+      // If actively editing a block, do not replace layout to preserve DOM focus
+      if (activeEditingIndex !== null) return;
+
+      articleBlocks = splitMarkdownToBlocks(bodyText);
+
+      if (articleBlocks.length === 0) {
+        articleBlocks = [""];
       }
+
+      let html = "";
+      for (let i = 0; i < articleBlocks.length; i++) {
+        const blockText = articleBlocks[i];
+        let renderedHtml = marked.parse(blockText);
+        if (!blockText.trim()) {
+          renderedHtml = "<p style='color:#857a70;font-style:italic;'>[Empty paragraph. Click to write...]</p>";
+        }
+        html += \`
+          <div class="typora-block" data-index="\${i}" onclick="handleBlockClick(event, \${i})">
+            <div class="typora-block-rendered">\${renderedHtml}</div>
+            <textarea class="typora-block-editor" style="display:none;" placeholder="Write block content..."></textarea>
+          </div>
+        \`;
+      }
+      bodyView.innerHTML = html;
+
+      // Compile math equations for full editor sheet
       if (window.renderMathInElement) {
         renderMathInElement(bodyView, {
           delimiters: [
@@ -1256,45 +1336,154 @@ function getEditorHtml() {
       }
     }
 
-    function autoResizeTextarea(textarea) {
-      textarea.style.height = 'auto';
-      textarea.style.height = (textarea.scrollHeight + 50) + 'px';
+    function handleBlockClick(event, index) {
+      event.stopPropagation(); // Stop bubbling to prevent outer body edit trigger
+      if (event.target.classList.contains('typora-block-editor')) {
+        return;
+      }
+      enterBlockEdit(index);
+    }
+
+    function enterBlockEdit(index) {
+      if (activeEditingIndex !== null) {
+        if (activeEditingIndex === index) return;
+        exitBlockEdit(activeEditingIndex);
+      }
+
+      activeEditingIndex = index;
+      const blockEl = document.querySelector('.typora-block[data-index="' + index + '"]');
+      if (!blockEl) return;
+
+      const renderedEl = blockEl.querySelector('.typora-block-rendered');
+      const editorEl = blockEl.querySelector('.typora-block-editor');
+
+      renderedEl.style.display = 'none';
+      editorEl.style.display = 'block';
+      editorEl.value = articleBlocks[index] || "";
+
+      blockEl.classList.add('editing');
+      autoResizeTextarea(editorEl);
+      editorEl.focus();
+
+      setupBlockEvents(editorEl, index);
+    }
+
+    function exitBlockEdit(index) {
+      if (activeEditingIndex === null || activeEditingIndex !== index) return;
+
+      const blockEl = document.querySelector('.typora-block[data-index="' + index + '"]');
+      if (!blockEl) {
+        activeEditingIndex = null;
+        return;
+      }
+
+      const renderedEl = blockEl.querySelector('.typora-block-rendered');
+      const editorEl = blockEl.querySelector('.typora-block-editor');
+
+      const newVal = editorEl.value;
+      articleBlocks[index] = newVal;
+
+      activePostBody = articleBlocks.join('\\n\\n');
+      rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
+
+      if (newVal.trim() === "") {
+        renderedEl.innerHTML = "<p style='color:#857a70;font-style:italic;'>[Empty paragraph. Click to write...]</p>";
+      } else {
+        renderedEl.innerHTML = marked.parse(newVal);
+      }
+
+      if (window.renderMathInElement) {
+        renderMathInElement(renderedEl, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\\\(', right: '\\\\)', display: false},
+            {left: '\\\\[', right: '\\\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+
+      editorEl.style.display = 'none';
+      renderedEl.style.display = 'block';
+      blockEl.classList.remove('editing');
+
+      activeEditingIndex = null;
+
+      // Clean empty block to maintain clean spaces
+      if (newVal.trim() === "" && articleBlocks.length > 1) {
+        articleBlocks.splice(index, 1);
+        activePostBody = articleBlocks.join('\\n\\n');
+        rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
+        renderTyporaBodyHtml(activePostBody);
+      }
+    }
+
+    function setupBlockEvents(editorEl, index) {
+      let blurTimeout;
+      editorEl.addEventListener('blur', () => {
+        blurTimeout = setTimeout(() => {
+          exitBlockEdit(index);
+        }, 120);
+      });
+
+      editorEl.addEventListener('input', (e) => {
+        autoResizeTextarea(e.target);
+      });
+
+      editorEl.addEventListener('keydown', (e) => {
+        // Enter key (without Shift) creates and focuses a new paragraph block below
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          clearTimeout(blurTimeout);
+
+          const currentVal = editorEl.value;
+          articleBlocks[index] = currentVal;
+
+          articleBlocks.splice(index + 1, 0, "");
+          activePostBody = articleBlocks.join('\\n\\n');
+          rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
+
+          renderTyporaBodyHtml(activePostBody);
+
+          setTimeout(() => {
+            enterBlockEdit(index + 1);
+          }, 30);
+        }
+
+        // Backspace on empty text deletes the paragraph and navigates to the previous block
+        if (e.key === 'Backspace' && editorEl.value === '') {
+          e.preventDefault();
+          clearTimeout(blurTimeout);
+
+          articleBlocks.splice(index, 1);
+          if (articleBlocks.length === 0) {
+            articleBlocks = [""];
+          }
+          activePostBody = articleBlocks.join('\\n\\n');
+          rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
+
+          renderTyporaBodyHtml(activePostBody);
+
+          setTimeout(() => {
+            const prevIdx = index > 0 ? index - 1 : 0;
+            enterBlockEdit(prevIdx);
+
+            const prevEditor = document.querySelector('.typora-block[data-index="' + prevIdx + '"] .typora-block-editor');
+            if (prevEditor) {
+              prevEditor.focus();
+              const len = prevEditor.value.length;
+              prevEditor.setSelectionRange(len, len);
+            }
+          }, 30);
+        }
+      });
     }
 
     function enterTyporaBodyEdit() {
-      const viewEl = document.getElementById('typora-body-view');
-      const editorEl = document.getElementById('typora-body-editor');
-      const doneBtn = document.getElementById('btn-typora-done');
-
-      // Keep both renderer and editor block active to support typing preview
-      viewEl.style.display = 'block';
-      viewEl.classList.add('live-rendering-split');
-
-      editorEl.style.display = 'block';
-      if (doneBtn) doneBtn.style.display = 'inline-flex';
-      editorEl.value = activePostBody;
-
-      // Perform initial compiler render to sync content
-      renderTyporaBodyHtml(activePostBody);
-
-      autoResizeTextarea(editorEl);
-      editorEl.focus();
-    }
-
-    function exitTyporaBodyEdit() {
-      const viewEl = document.getElementById('typora-body-view');
-      const editorEl = document.getElementById('typora-body-editor');
-      const doneBtn = document.getElementById('btn-typora-done');
-
-      activePostBody = editorEl.value;
-      rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
-
-      renderTyporaBodyHtml(activePostBody);
-
-      editorEl.style.display = 'none';
-      if (doneBtn) doneBtn.style.display = 'none';
-      viewEl.style.display = 'block';
-      viewEl.classList.remove('live-rendering-split');
+      // Default to edit the last block (or first block if empty) when outer sheet whitespace is clicked
+      const idx = articleBlocks.length > 0 ? articleBlocks.length - 1 : 0;
+      enterBlockEdit(idx);
     }
 
     // --- Image pasting handle ---
