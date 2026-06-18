@@ -1591,10 +1591,13 @@ function getEditorHtml() {
     }
 
     async function uploadPastedImageEasyMDE(file, cm) {
-      const placeholder = "\\n![Uploading " + file.name + "...]()\\n";
+      const placeholder = "![Uploading " + file.name + "...]()";
       const doc = cm.getDoc();
-      const cursor = doc.getCursor();
-      doc.replaceRange(placeholder, cursor);
+
+      // Replace active selection directly to substitute highlighted text
+      const from = doc.getCursor("from");
+      const to = doc.getCursor("to");
+      doc.replaceRange(placeholder, from, to);
 
       try {
         const res = await fetch('/api/images', {
@@ -1604,10 +1607,28 @@ function getEditorHtml() {
         });
         const data = await res.json();
         if (data.success) {
-          const finalMarkdown = "\\n![pasted-image](" + data.localPath + ")\\n";
-          const content = doc.getValue();
-          const newContent = content.replace(placeholder, finalMarkdown);
-          doc.setValue(newContent);
+          const finalMarkdown = "![pasted-image](" + data.localPath + ")";
+
+          // Locate the unique placeholder inside document lines and replace in-place
+          var lineCount = doc.lineCount();
+          var foundLine = -1;
+          var foundCh = -1;
+          for (var i = 0; i < lineCount; i++) {
+            var lineText = doc.getLine(i);
+            var idx = lineText.indexOf(placeholder);
+            if (idx !== -1) {
+              foundLine = i;
+              foundCh = idx;
+              break;
+            }
+          }
+
+          if (foundLine !== -1) {
+            doc.replaceRange(finalMarkdown, { line: foundLine, ch: foundCh }, { line: foundLine, ch: foundCh + placeholder.length });
+          } else {
+            const content = doc.getValue();
+            doc.setValue(content.replace(placeholder, finalMarkdown));
+          }
 
           activePostBody = easyMde.value();
           if (activePost && openTabs[activePost]) {
@@ -1621,13 +1642,51 @@ function getEditorHtml() {
           rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
         } else {
           await showCustomAlert('Upload failed: ' + data.error);
-          const content = doc.getValue();
-          doc.setValue(content.replace(placeholder, ''));
+
+          // Clean placeholder
+          var lineCount = doc.lineCount();
+          var foundLine = -1;
+          var foundCh = -1;
+          for (var i = 0; i < lineCount; i++) {
+            var lineText = doc.getLine(i);
+            var idx = lineText.indexOf(placeholder);
+            if (idx !== -1) {
+              foundLine = i;
+              foundCh = idx;
+              break;
+            }
+          }
+
+          if (foundLine !== -1) {
+            doc.replaceRange("", { line: foundLine, ch: foundCh }, { line: foundLine, ch: foundCh + placeholder.length });
+          } else {
+            const content = doc.getValue();
+            doc.setValue(content.replace(placeholder, ''));
+          }
         }
       } catch (err) {
         await showCustomAlert('Upload connection error: ' + err.message);
-        const content = doc.getValue();
-        doc.setValue(content.replace(placeholder, ''));
+
+        // Clean placeholder
+        var lineCount = doc.lineCount();
+        var foundLine = -1;
+        var foundCh = -1;
+        for (var i = 0; i < lineCount; i++) {
+          var lineText = doc.getLine(i);
+          var idx = lineText.indexOf(placeholder);
+          if (idx !== -1) {
+            foundLine = i;
+            foundCh = idx;
+            break;
+          }
+        }
+
+        if (foundLine !== -1) {
+          doc.replaceRange("", { line: foundLine, ch: foundCh }, { line: foundLine, ch: foundCh + placeholder.length });
+        } else {
+          const content = doc.getValue();
+          doc.setValue(content.replace(placeholder, ''));
+        }
       }
     }
 
