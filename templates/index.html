@@ -1,46 +1,21 @@
 {% extends "base.html" %} {% block content %}
-<div class="blog-posts-grid" style="display: flex; flex-direction: column; gap: 1.5rem">
+<div class="zen-post-list">
   {% for page in section.pages %}
-  <article class="nes-container is-rounded with-title" style="background: #fff; padding: 1.5rem">
-    <p class="title" style="font-size: 1.1rem; font-family: var(--font-pixel-cn); margin: 0">
-      <a
-        href="{{ page.permalink }}"
-        style="color: var(--fc-crimson); text-decoration: none; font-weight: bold"
-        >📖 {{ page.title }}</a
-      >
-    </p>
-    <div style="font-size: 0.8rem; margin-bottom: 1rem">
-      <span class="nes-badge" style="display: inline-flex"
-        ><span class="is-error" style="font-family: var(--font-pixel-en)"
-          >{{ page.date | date(format="%Y-%m-%d") }}</span
-        ></span
+  <article class="zen-post-item">
+    <h2>
+      <a href="{{ page.permalink }}">{{ page.title }}</a>
+    </h2>
+    <div class="zen-post-meta">
+      <time datetime="{{ page.date | date(format='%Y-%m-%d') }}"
+        >{{ page.date | date(format="%Y-%m-%d") }}</time
       >
     </div>
-    {% if page.summary %}
-    <div
-      class="post-summary"
-      style="
-        font-family: var(--font-pixel-cn);
-        line-height: 1.6;
-        font-size: 0.95rem;
-        color: var(--fc-black);
-      "
-    >
-      {{ page.summary | safe }}
+    <div class="zen-post-summary">
+      {% if page.summary %} {{ page.summary | safe }} {% else %} {{ page.description }} {% endif %}
     </div>
-    {% else %}
-    <div
-      class="post-summary"
-      style="
-        font-family: var(--font-pixel-cn);
-        line-height: 1.6;
-        font-size: 0.95rem;
-        color: var(--fc-black);
-      "
-    >
-      {{ page.description }}
+    <div style="margin-top: 1.5rem">
+      <a href="{{ page.permalink }}" class="read-more-link">阅读全文 &rarr;</a>
     </div>
-    {% endif %}
   </article>
   {% endfor %}
 </div>
