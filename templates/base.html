@@ -20,6 +20,8 @@
     {% block extra_head %}{% endblock extra_head %}
   </head>
   <body>
+    <div id="reading-progress" class="reading-progress-bar"></div>
+
     <header class="zen-header">
       <a href="/"><h1>{{ config.title }}</h1></a>
       <p>保持专注，静心阅读</p>
@@ -30,10 +32,23 @@
       </nav>
     </header>
 
-    <main class="zen-container">{% block content %}{% endblock content %}</main>
+    <main class="{% block container_class %}zen-container{% endblock %}">
+      {% block content %}{% endblock content %}
+    </main>
 
     <footer class="zen-footer">
       <p>&copy; {{ now() | date(format="%Y") }} Xuepoo. Crafted in Zen.</p>
     </footer>
+
+    <script>
+      document.addEventListener("scroll", () => {
+        const progress = document.getElementById("reading-progress");
+        if (progress) {
+          const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+          const progressWidth = totalHeight > 0 ? (window.pageYOffset / totalHeight) * 100 : 0;
+          progress.style.width = progressWidth + "%";
+        }
+      });
+    </script>
   </body>
 </html>

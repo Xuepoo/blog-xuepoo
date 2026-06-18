@@ -1,18 +1,83 @@
-{% extends "base.html" %} {% block content %}
-<article class="zen-single-post">
-  <header>
-    <h1>{{ page.title }}</h1>
-    <div class="zen-post-meta">
-      <time datetime="{{ page.date | date(format='%Y-%m-%d') }}"
-        >{{ page.date | date(format="%Y-%m-%d") }}</time
-      >
-    </div>
-  </header>
+{% extends "base.html" %} {% block container_class %}zen-container {% if page.toc %}has-toc{% endif
+%}{% endblock %} {% block content %}
+<div class="zen-main-column">
+  <article class="zen-single-post">
+    <header>
+      <h1>{{ page.title }}</h1>
+      <div class="zen-post-meta">
+        <time datetime="{{ page.date | date(format='%Y-%m-%d') }}"
+          >{{ page.date | date(format="%Y-%m-%d") }}</time
+        >
+        &middot; 字数: {{ page.word_count }} 字 &middot; 预计阅读: {{ page.reading_time }} 分钟
+      </div>
+    </header>
 
-  <div class="zen-article-body">{{ page.content | safe }}</div>
-</article>
+    {% if page.toc %}
+    <!-- Collapsible TOC for Mobile Screen sizes -->
+    <details class="mobile-toc">
+      <summary>文章目录</summary>
+      <ul class="zen-toc-list">
+        {% for h1 in page.toc %}
+        <li>
+          <a href="{{ h1.permalink }}">{{ h1.title }}</a>
+          {% if h1.children %}
+          <ul>
+            {% for h2 in h1.children %}
+            <li>
+              <a href="{{ h2.permalink }}">{{ h2.title }}</a>
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
 
-<div class="back-to-list">
-  <a href="/">&larr; 返回列表</a>
+    <div class="zen-article-body">{{ page.content | safe }}</div>
+
+    {% if page.later or page.earlier %}
+    <!-- Prev/Next post navigation -->
+    <nav class="zen-post-nav">
+      <div class="nav-prev">
+        {% if page.earlier %}
+        <a href="{{ page.earlier.permalink }}">&larr; {{ page.earlier.title }}</a>
+        {% endif %}
+      </div>
+      <div class="nav-next">
+        {% if page.later %}
+        <a href="{{ page.later.permalink }}">{{ page.later.title }} &rarr;</a>
+        {% endif %}
+      </div>
+    </nav>
+    {% endif %}
+  </article>
+
+  <div class="back-to-list">
+    <a href="/">&larr; 返回列表</a>
+  </div>
 </div>
-{% endblock content %}
+
+{% if page.toc %}
+<!-- Sticky TOC for Desktop screens -->
+<aside class="zen-toc-container">
+  <div class="zen-toc-title">目录</div>
+  <ul class="zen-toc-list">
+    {% for h1 in page.toc %}
+    <li>
+      <a href="{{ h1.permalink }}">{{ h1.title }}</a>
+      {% if h1.children %}
+      <ul>
+        {% for h2 in h1.children %}
+        <li>
+          <a href="{{ h2.permalink }}">{{ h2.title }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</aside>
+{% endif %} {% endblock content %}
