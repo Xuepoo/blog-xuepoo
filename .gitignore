@@ -10,4 +10,4 @@ node_modules/
 .wrangler/
 static/tmp/
 .obsidian/
-assets/
+static/assets/
