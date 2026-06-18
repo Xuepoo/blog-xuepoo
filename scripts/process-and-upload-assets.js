@@ -12,12 +12,14 @@ const files = fs.readdirSync(POSTS_DIR).filter((f) => f.endsWith(".md"));
 files.forEach((file) => {
   const filePath = path.join(POSTS_DIR, file);
   let content = fs.readFileSync(filePath, "utf-8");
-  const tempImageRegex = /(?:\.\.\/\.\.\/static|\/static|)\/tmp\/raw\/images\/([^\s"'>)]+)/g;
+  // Matches both the old static/tmp/raw/images path and the new assets/ path
+  const tempImageRegex =
+    /((?:\.\.\/\.\.\/static|\/static|)\/tmp\/raw\/images|(?:\.\.\/)*assets)\/([^\s"'>)]+)/g;
   let match;
   let matches = [];
 
   while ((match = tempImageRegex.exec(content)) !== null) {
-    matches.push({ fullMatch: match[0], imgName: match[1] });
+    matches.push({ fullMatch: match[0], prefix: match[1], imgName: match[2] });
   }
 
   if (matches.length > 0) {
@@ -26,8 +28,19 @@ files.forEach((file) => {
     let updatedContent = content;
     let hasFailed = false;
 
-    matches.forEach(({ fullMatch, imgName }) => {
-      const imgLocalPath = path.join(__dirname, "../static/tmp/raw/images", imgName);
+    matches.forEach(({ fullMatch, prefix, imgName }) => {
+      // Determine local path based on matched prefix
+      let imgLocalPath;
+      if (prefix.includes("assets")) {
+        imgLocalPath = path.join(__dirname, "../assets", decodeURIComponent(imgName));
+      } else {
+        imgLocalPath = path.join(
+          __dirname,
+          "../static/tmp/raw/images",
+          decodeURIComponent(imgName),
+        );
+      }
+
       if (!fs.existsSync(imgLocalPath)) {
         console.warn(`Local file ${imgLocalPath} not found!`);
         return;
