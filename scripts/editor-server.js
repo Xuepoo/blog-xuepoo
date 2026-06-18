@@ -727,7 +727,7 @@ function getEditorHtml() {
 
     /* Interactive body rendering styles (Typora look) */
     .typora-body-view {
-      min-height: 500px;
+      min-height: max(500px, calc(100vh - 300px));
       outline: none;
       padding: 12px;
       cursor: text;
@@ -952,6 +952,8 @@ function getEditorHtml() {
     let activeView = "typora";
     let articleBlocks = [];
     let activeEditingIndex = null;
+    let ignoreBlur = false;
+    let clickedInsideEditor = false;
 
     marked.setOptions({
       breaks: true,
@@ -1102,6 +1104,13 @@ function getEditorHtml() {
       };
       activePostBody = "## New Section\\n\\nStart writing your content here...";
       rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
+
+      if (document.getElementById('split-editor-textarea')) {
+        document.getElementById('split-editor-textarea').value = rawContent;
+      }
+      if (document.getElementById('raw-editor-textarea')) {
+        document.getElementById('raw-editor-textarea').value = rawContent;
+      }
 
       saveActivePost();
     }
@@ -1490,8 +1499,17 @@ function getEditorHtml() {
     function setupBlockEvents(editorEl, index) {
       let blurTimeout;
       editorEl.addEventListener('blur', () => {
+        if (ignoreBlur) return;
         blurTimeout = setTimeout(() => {
-          exitBlockEdit(index);
+          if (clickedInsideEditor) {
+            const activeEl = document.activeElement;
+            if (!activeEl || !activeEl.classList.contains('typora-block-editor')) {
+              editorEl.focus();
+            }
+            clickedInsideEditor = false;
+          } else {
+            exitBlockEdit(index);
+          }
         }, 120);
       });
 
@@ -1505,6 +1523,7 @@ function getEditorHtml() {
           e.preventDefault();
           clearTimeout(blurTimeout);
 
+          ignoreBlur = true;
           const currentVal = editorEl.value;
           articleBlocks[index] = currentVal;
 
@@ -1514,9 +1533,8 @@ function getEditorHtml() {
 
           renderTyporaBodyHtml(activePostBody);
 
-          setTimeout(() => {
-            enterBlockEdit(index + 1);
-          }, 30);
+          enterBlockEdit(index + 1);
+          ignoreBlur = false;
         }
 
         // Backspace on empty text deletes the paragraph and navigates to the previous block
@@ -1524,6 +1542,7 @@ function getEditorHtml() {
           e.preventDefault();
           clearTimeout(blurTimeout);
 
+          ignoreBlur = true;
           articleBlocks.splice(index, 1);
           if (articleBlocks.length === 0) {
             articleBlocks = [""];
@@ -1533,17 +1552,16 @@ function getEditorHtml() {
 
           renderTyporaBodyHtml(activePostBody);
 
-          setTimeout(() => {
-            const prevIdx = index > 0 ? index - 1 : 0;
-            enterBlockEdit(prevIdx);
+          const prevIdx = index > 0 ? index - 1 : 0;
+          enterBlockEdit(prevIdx);
 
-            const prevEditor = document.querySelector('.typora-block[data-index="' + prevIdx + '"] .typora-block-editor');
-            if (prevEditor) {
-              prevEditor.focus();
-              const len = prevEditor.value.length;
-              prevEditor.setSelectionRange(len, len);
-            }
-          }, 30);
+          const prevEditor = document.querySelector('.typora-block[data-index="' + prevIdx + '"] .typora-block-editor');
+          if (prevEditor) {
+            prevEditor.focus();
+            const len = prevEditor.value.length;
+            prevEditor.setSelectionRange(len, len);
+          }
+          ignoreBlur = false;
         }
       });
     }
@@ -1627,6 +1645,13 @@ function getEditorHtml() {
     window.addEventListener('DOMContentLoaded', () => {
       loadPosts();
       setupPasteHooks();
+
+      // Capture clicks on the paper sheet (excluding metadata form) to prevent editor deactivation
+      document.querySelector('.paper-sheet').addEventListener('mousedown', (e) => {
+        if (!e.target.closest('.typora-metadata-container')) {
+          clickedInsideEditor = true;
+        }
+      });
 
       window.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
