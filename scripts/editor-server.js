@@ -740,6 +740,24 @@ function getEditorHtml() {
       overflow: hidden;
       display: none;
     }
+    .typora-body-view.live-rendering-split {
+      border-top: 1px dashed #e0dcd3;
+      margin-top: 2.5rem;
+      padding-top: 2rem;
+      position: relative;
+    }
+    .typora-body-view.live-rendering-split::before {
+      content: "Instant Typing Preview";
+      position: absolute;
+      top: -10px;
+      left: 10px;
+      background: #fcfbfa;
+      padding: 0 10px;
+      font-size: 0.75rem;
+      color: #857a70;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
 
     .tip-text {
       font-size: 0.75rem;
@@ -1248,10 +1266,17 @@ function getEditorHtml() {
       const editorEl = document.getElementById('typora-body-editor');
       const doneBtn = document.getElementById('btn-typora-done');
 
-      viewEl.style.display = 'none';
+      // Keep both renderer and editor block active to support typing preview
+      viewEl.style.display = 'block';
+      viewEl.classList.add('live-rendering-split');
+
       editorEl.style.display = 'block';
       if (doneBtn) doneBtn.style.display = 'inline-flex';
       editorEl.value = activePostBody;
+
+      // Perform initial compiler render to sync content
+      renderTyporaBodyHtml(activePostBody);
+
       autoResizeTextarea(editorEl);
       editorEl.focus();
     }
@@ -1269,6 +1294,7 @@ function getEditorHtml() {
       editorEl.style.display = 'none';
       if (doneBtn) doneBtn.style.display = 'none';
       viewEl.style.display = 'block';
+      viewEl.classList.remove('live-rendering-split');
     }
 
     // --- Image pasting handle ---
@@ -1328,8 +1354,13 @@ function getEditorHtml() {
           });
 
           if (id === 'typora-body-editor') {
+            let renderTimeout;
             el.addEventListener('input', (e) => {
               autoResizeTextarea(e.target);
+              clearTimeout(renderTimeout);
+              renderTimeout = setTimeout(() => {
+                renderTyporaBodyHtml(e.target.value);
+              }, 150);
             });
           }
         }
