@@ -49,23 +49,29 @@ tags = ["CI-CD", "Linux", "Rust"]
 
 正文直接在元数据下方使用标准 Markdown 编写。系统会自动解析生成目录（TOC）、代码高亮与字数统计。
 
-### 提交前质量检查 (Quality Gate)
+### 直接部署发布
 
-本项目配置了极严的代码规范与排版校验。每次提交前，必须运行 `pre-commit` 来确保代码格式化及排版合格：
+因为移除了 GitHub Actions 自动部署（避免消耗 Private 仓库构建时间额度），现统一采用**本地直接部署**方式。
+
+在文章编写预览完成后，直接在项目根目录下执行部署脚本：
 
 ```bash
-pre-commit run --all-files
+./deploy.sh
 ```
 
-校验通过后，使用常规 git 命令提交并推送：
+该脚本会自动执行：
+
+1. `pre-commit` 静态质量与排版检查。
+2. `zola build` 生产环境静态页面编译。
+3. `wrangler pages deploy` 直接将 `public/` 静态文件发布到 Cloudflare Pages。
+
+部署成功后，使用常规 git 命令将代码源文件推送备份到 GitHub 即可：
 
 ```bash
 git add .
 git commit -m "feat(blog): publish my new post"
 git push
 ```
-
-推送至 `main` 分支后，GitHub Actions 管道会自动编译并部署至 Cloudflare Pages。
 
 ---
 
