@@ -131,10 +131,21 @@ function processImportedMarkdown(filePath) {
 }
 
 function parseFrontmatter(fileContent) {
-  const match = fileContent.match(/^\+\+\+\r?\n([\s\S]*?)\r?\n\+\+\+\r?\n([\s\S]*)$/);
-  if (!match) return { frontmatter: {}, body: fileContent };
-  const fmRaw = match[1];
-  const body = match[2];
+  const content = fileContent.trimStart();
+  if (!content.startsWith("+++")) {
+    return { frontmatter: {}, body: fileContent };
+  }
+  const secondPlusPlusPlusIndex = content.indexOf("+++", 3);
+  if (secondPlusPlusPlusIndex === -1) {
+    return { frontmatter: {}, body: fileContent };
+  }
+  const fmRaw = content.slice(3, secondPlusPlusPlusIndex).trim();
+  let body = content.slice(secondPlusPlusPlusIndex + 3);
+  if (body.startsWith("\r\n")) {
+    body = body.slice(2);
+  } else if (body.startsWith("\n")) {
+    body = body.slice(1);
+  }
   const frontmatter = {};
 
   // Simple TOML-like parser for key-value strings
@@ -159,13 +170,17 @@ function parseFrontmatter(fileContent) {
 
 function stringifyFrontmatter(frontmatter, body) {
   let fmRaw = "+++\n";
+  let taxRaw = "";
   for (const [key, val] of Object.entries(frontmatter)) {
-    if (Array.isArray(val)) {
+    if (key === "tags") {
+      taxRaw += `[taxonomies]\ntags = [${val.map((v) => `"${v}"`).join(", ")}]\n`;
+    } else if (Array.isArray(val)) {
       fmRaw += `${key} = [${val.map((v) => `"${v}"`).join(", ")}]\n`;
     } else {
       fmRaw += `${key} = "${val}"\n`;
     }
   }
+  fmRaw += taxRaw;
   fmRaw += "+++\n";
   return fmRaw + body;
 }
@@ -844,8 +859,19 @@ function getEditorHtml() {
         </div>
       </div>
 
-      <!-- Workspace views -->
       <div id="workspace">
+
+        <!-- View: No Post Selected Placeholder -->
+        <div id="view-no-post" class="view-pane" style="display: none; align-items: center; justify-content: center; height: 60vh; text-align: center; font-family: inherit;">
+          <div style="background: #faf6ef; border: 2px solid #e0dcd3; border-radius: 8px; padding: 3rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); max-width: 450px; margin: auto;">
+            <div style="font-size: 3rem; margin-bottom: 1.5rem;">✍️</div>
+            <h3 style="margin-top: 0; color: #3c3836; font-size: 1.25rem;">No Article Selected</h3>
+            <p style="color: #7c6f64; font-size: 0.9rem; line-height: 1.6; margin-bottom: 1.5rem;">
+              Select an article from the left sidebar to start editing, or create a brand new post.
+            </p>
+            <button class="btn btn-primary" onclick="createNewPost()">+ Create New Post</button>
+          </div>
+        </div>
 
         <!-- View: Typora (Interactive WYSIWYG) -->
         <div id="view-typora" class="view-pane active">
@@ -979,8 +1005,29 @@ function getEditorHtml() {
       }
 
       const panes = document.querySelectorAll('.view-pane');
-      panes.forEach(pane => pane.classList.remove('active'));
-      document.getElementById('view-' + viewName).classList.add('active');
+      panes.forEach(pane => {
+        pane.classList.remove('active');
+        pane.style.display = 'none';
+      });
+
+      if (!activePost) {
+        const noPostPane = document.getElementById('view-no-post');
+        if (noPostPane) {
+          noPostPane.classList.add('active');
+          noPostPane.style.display = 'flex';
+        }
+        return;
+      }
+
+      const activePane = document.getElementById('view-' + viewName);
+      if (activePane) {
+        activePane.classList.add('active');
+        if (viewName === 'split') {
+          activePane.style.display = 'flex';
+        } else {
+          activePane.style.display = 'block';
+        }
+      }
 
       if (viewName === 'typora') {
         splitRawToMetadataAndBody();
@@ -1013,6 +1060,12 @@ function getEditorHtml() {
             <div style="font-size:0.75rem;color:#857a70;margin-top:0.25rem;">📅 \${p.date}</div>
           </div>
         \`).join('');
+
+        if (!activePost && posts.length > 0) {
+          selectPost(posts[0].filename);
+        } else {
+          switchView(activeView);
+        }
       } catch (err) {
         console.error("Failed to load posts", err);
       }
@@ -1151,10 +1204,21 @@ function getEditorHtml() {
     // --- Parser & Sync Helpers ---
 
     function parseFrontmatter(fileContent) {
-      const match = fileContent.match(/^\\+\\+\\+\\r?\\n([\\s\\S]*?)\\r?\\n\\+\\+\\+\\r?\\n([\\s\\S]*)$/);
-      if (!match) return { frontmatter: {}, body: fileContent };
-      const fmRaw = match[1];
-      const body = match[2];
+      const content = fileContent.trimStart();
+      if (!content.startsWith('+++')) {
+        return { frontmatter: {}, body: fileContent };
+      }
+      const secondPlusPlusPlusIndex = content.indexOf('+++', 3);
+      if (secondPlusPlusPlusIndex === -1) {
+        return { frontmatter: {}, body: fileContent };
+      }
+      const fmRaw = content.slice(3, secondPlusPlusPlusIndex).trim();
+      let body = content.slice(secondPlusPlusPlusIndex + 3);
+      if (body.startsWith('\\r\\n')) {
+        body = body.slice(2);
+      } else if (body.startsWith('\\n')) {
+        body = body.slice(1);
+      }
       const frontmatter = {};
 
       fmRaw.split('\\n').forEach(line => {
@@ -1173,13 +1237,17 @@ function getEditorHtml() {
 
     function stringifyFrontmatter(frontmatter, body) {
       let fmRaw = "+++\\n";
+      let taxRaw = "";
       for (const [key, val] of Object.entries(frontmatter)) {
-        if (Array.isArray(val)) {
+        if (key === 'tags') {
+          taxRaw += \`[taxonomies]\\ntags = [\${val.map(v => \`"\${v}"\`).join(', ')}]\\n\`;
+        } else if (Array.isArray(val)) {
           fmRaw += \`\${key} = [\${val.map(v => \`"\${v}"\`).join(', ')}]\\n\`;
         } else {
           fmRaw += \`\${key} = "\${val}"\\n\`;
         }
       }
+      fmRaw += taxRaw;
       fmRaw += "+++\\n";
       return fmRaw + body;
     }
