@@ -229,7 +229,7 @@ a:hover {
 
   .zen-container.has-toc.toc-collapsed {
     grid-template-columns: 1fr;
-    max-width: 680px;
+    max-width: 780px;
   }
 
   .zen-container.has-toc.toc-collapsed .zen-toc-container {
