@@ -1577,17 +1577,25 @@ function getEditorHtml() {
       // EasyMDE change hook
       easyMde.codemirror.on("change", onEasyMdeChange);
 
-      // EasyMDE paste hook for images
-      easyMde.codemirror.on("paste", async (cm, e) => {
+      // Intercept paste event in capture phase to run before EasyMDE/CodeMirror handlers
+      easyMde.codemirror.getWrapperElement().addEventListener("paste", async (e) => {
         const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-        for (let item of items) {
-          if (item.kind === 'file' && item.type.startsWith('image/')) {
-            e.preventDefault();
-            const file = item.getAsFile();
-            await uploadPastedImageEasyMDE(file, cm);
+        if (!items) return;
+
+        let imageFile = null;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
+            imageFile = items[i].getAsFile();
+            break;
           }
         }
-      });
+
+        if (imageFile) {
+          e.preventDefault();
+          e.stopPropagation(); // Prevent EasyMDE from parsing text/html and pasting duplicate markdown
+          await uploadPastedImageEasyMDE(imageFile, easyMde.codemirror);
+        }
+      }, true);
     }
 
     async function uploadPastedImageEasyMDE(file, cm) {
@@ -1626,12 +1634,9 @@ function getEditorHtml() {
           if (foundLine !== -1) {
             doc.replaceRange(finalMarkdown, { line: foundLine, ch: foundCh }, { line: foundLine, ch: foundCh + placeholder.length });
           } else {
-            const scrollInfo = cm.getScrollInfo();
+            // Placeholder not found (possibly overwritten). Insert at current cursor.
             const cursor = doc.getCursor();
-            const content = doc.getValue();
-            doc.setValue(content.replace(placeholder, finalMarkdown));
-            doc.setCursor(cursor);
-            cm.scrollTo(scrollInfo.left, scrollInfo.top);
+            doc.replaceRange(finalMarkdown, cursor);
           }
 
           activePostBody = easyMde.value();
