@@ -198,6 +198,22 @@ const server = http.createServer((req, res) => {
   }
 
   // --- Static Assets Mapping ---
+  if (req.url === "/tmp/easymde.min.js") {
+    const jsPath = path.resolve(__dirname, "..", config.staticDir, "tmp/easymde.min.js");
+    if (fs.existsSync(jsPath)) {
+      res.writeHead(200, { "Content-Type": "application/javascript" });
+      res.end(fs.readFileSync(jsPath));
+      return;
+    }
+  }
+  if (req.url === "/tmp/easymde.min.css") {
+    const cssPath = path.resolve(__dirname, "..", config.staticDir, "tmp/easymde.min.css");
+    if (fs.existsSync(cssPath)) {
+      res.writeHead(200, { "Content-Type": "text/css" });
+      res.end(fs.readFileSync(cssPath));
+      return;
+    }
+  }
   if (req.url === "/favicon.svg") {
     const faviconPath = path.resolve(__dirname, "..", config.staticDir, "favicon.svg");
     if (fs.existsSync(faviconPath)) {
@@ -403,6 +419,9 @@ function getEditorHtml() {
   <link rel="stylesheet" href="/giallo-light.css">
   <!-- Load local markdown renderer -->
   <script src="/tmp/marked.min.js"></script>
+  <!-- Load EasyMDE Editor -->
+  <link rel="stylesheet" href="/tmp/easymde.min.css">
+  <script src="/tmp/easymde.min.js"></script>
   <!-- Load KaTeX math library -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
@@ -577,79 +596,13 @@ function getEditorHtml() {
       font-size: 0.9rem;
     }
 
-    /* Tabs select options */
-    .view-tabs {
-      display: flex;
-      background: #fff;
-      border: 1px solid #4a3e3d;
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    .tab-item {
-      padding: 5px 12px;
-      font-size: 0.8rem;
-      cursor: pointer;
-      font-weight: bold;
-      border: none;
-      background: none;
-      color: #4a3e3d;
-      transition: all 0.15s ease;
-      user-select: none;
-    }
-    .tab-item:not(:first-child) {
-      border-left: 1px solid #4a3e3d;
-    }
-    .tab-item.active {
-      background: #4a3e3d;
-      color: #fff;
-    }
-
     /* Editor workspace box */
     #workspace {
       flex: 1;
       position: relative;
       overflow: hidden;
     }
-
-    /* View panes */
-    .view-pane {
-      display: none;
-      width: 100%;
-      height: 100%;
-      overflow-y: auto;
-      box-sizing: border-box;
-    }
-    .view-pane.active {
-      display: block;
-    }
-
-    /* Split view pane configuration */
-    #view-split {
-      display: none;
-    }
-    #view-split.active {
-      display: flex;
-      flex-direction: row;
-    }
-    .split-left {
-      flex: 1;
-      border-right: 1px solid #e0dcd3;
-      padding: 1.5rem;
-      display: flex;
-      flex-direction: column;
-      box-sizing: border-box;
-      height: 100%;
-    }
-    .split-right {
-      flex: 1;
-      padding: 2rem;
-      background: #fff;
-      overflow-y: auto;
-      box-sizing: border-box;
-      height: 100%;
-    }
-
-    /* Paper sheet layout for center content preview/typora mode */
+    /* Paper sheet layout for center content preview */
     .paper-sheet {
       width: 92%;
       max-width: 820px;
@@ -657,25 +610,127 @@ function getEditorHtml() {
       background: #fdfcf7;
       box-sizing: border-box;
     }
-
-    /* Raw Text Mode Editor area */
-    .raw-textarea {
-      display: block;
-      width: 92%;
-      max-width: 820px;
-      height: calc(100vh - 110px);
-      margin: 1.5rem auto;
-      box-sizing: border-box;
-      font-family: SFMono-Regular, Consolas, 'Liberation Mono', Menlo, Courier, monospace;
-      font-size: 0.9rem;
-      line-height: 1.6;
-      border: 1px solid #e0dcd3;
+    /* EasyMDE styling overrides to match the premium paper-sheet theme */
+    .editor-toolbar {
+      background: #faf6ef !important;
+      border: 1px solid #e0dcd3 !important;
+      border-radius: 4px 4px 0 0 !important;
+      opacity: 0.9;
+    }
+    .editor-toolbar button {
+      color: #3c3836 !important;
+    }
+    .editor-toolbar button.active, .editor-toolbar button:hover {
+      background: #eee8d5 !important;
+      border-color: #c9c3b5 !important;
+    }
+    .CodeMirror {
+      background: #fdfcf7 !important;
+      color: #2c2c2a !important;
+      border: 1px solid #e0dcd3 !important;
+      border-top: none !important;
+      border-radius: 0 0 4px 4px !important;
+      font-family: 'Noto Sans SC', system-ui, -apple-system, sans-serif !important;
+      font-size: 1rem !important;
+      line-height: 1.7 !important;
+      min-height: 500px !important;
+      box-shadow: none !important;
+    }
+    .CodeMirror-focused {
+      border: 1px solid #4a3e3d !important;
+      border-top: none !important;
+    }
+    .editor-preview {
+      background: #fdfcf7 !important;
+      font-family: 'Noto Sans SC', system-ui, -apple-system, sans-serif !important;
+      line-height: 1.7 !important;
+    }
+    /* EasyMDE Fullscreen & Side-by-side Overrides to layer above sidebar */
+    .editor-toolbar.fullscreen,
+    .CodeMirror-fullscreen,
+    .CodeMirror-sided,
+    .editor-preview-active-side {
+      z-index: 99999 !important;
+    }
+    /* Modern Custom Modal Dialog Styles */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(40, 40, 40, 0.4);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+    }
+    .modal-card {
+      background: #faf6ef;
+      border: 1px solid #4a3e3d;
       border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      width: 90%;
+      max-width: 420px;
       padding: 1.5rem;
-      background: #fff;
-      resize: none;
+      box-sizing: border-box;
+      animation: modalFadeIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes modalFadeIn {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .modal-title {
+      margin-top: 0;
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+      font-size: 1.1rem;
+      color: #3c3836;
+      border-bottom: 1px solid #e0dcd3;
+      padding-bottom: 0.5rem;
+    }
+    .modal-message {
+      font-size: 0.9rem;
+      color: #504945;
+      line-height: 1.5;
+      margin-bottom: 1.25rem;
+      white-space: pre-line;
+    }
+    .modal-input-container {
+      margin-bottom: 1.25rem;
+    }
+    .modal-input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 12px;
+      border: 1px solid #c9c3b5;
+      border-radius: 4px;
+      background: #fdfcf7;
+      color: #2c2c2a;
       outline: none;
-      box-shadow: inset 0 1px 3px rgba(0,0,0,0.03);
+      font-family: inherit;
+    }
+    .modal-input:focus {
+      border-color: #4a3e3d;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+    /* Modal buttons style override matching Zola client button standard */
+    .modal-card .btn {
+      padding: 6px 16px;
+      font-size: 0.85rem;
+      border: 1px solid #c9c3b5;
+      cursor: pointer;
+    }
+    .modal-card .btn-primary {
+      background: #4a3e3d;
+      color: #fff;
+      border-color: #4a3e3d;
     }
 
     /* Metadata container inside Typora mode */
@@ -844,13 +899,7 @@ function getEditorHtml() {
           </div>
         </div>
 
-        <!-- Tabs selector -->
-        <div class="view-tabs">
-          <button class="tab-item active" onclick="switchView('typora')">Live</button>
-          <button class="tab-item" onclick="switchView('split')">Split Screen</button>
-          <button class="tab-item" onclick="switchView('raw')">Raw Source</button>
-          <button class="tab-item" onclick="switchView('preview')">Preview</button>
-        </div>
+
 
         <div class="toolbar-right">
           <div class="tip-text">Ctrl+V to paste image</div>
@@ -862,7 +911,7 @@ function getEditorHtml() {
       <div id="workspace">
 
         <!-- View: No Post Selected Placeholder -->
-        <div id="view-no-post" class="view-pane" style="display: none; align-items: center; justify-content: center; height: 60vh; text-align: center; font-family: inherit;">
+        <div id="view-no-post" style="display: flex; align-items: center; justify-content: center; height: 60vh; text-align: center; font-family: inherit;">
           <div style="background: #faf6ef; border: 2px solid #e0dcd3; border-radius: 8px; padding: 3rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); max-width: 450px; margin: auto;">
             <div style="font-size: 3rem; margin-bottom: 1.5rem;">✍️</div>
             <h3 style="margin-top: 0; color: #3c3836; font-size: 1.25rem;">No Article Selected</h3>
@@ -874,7 +923,7 @@ function getEditorHtml() {
         </div>
 
         <!-- View: Typora (Interactive WYSIWYG) -->
-        <div id="view-typora" class="view-pane active">
+        <div id="view-typora" style="display: none; width: 100%; height: 100%; overflow-y: auto; box-sizing: border-box;">
           <div class="paper-sheet">
 
             <!-- Metadata Panel -->
@@ -904,39 +953,30 @@ function getEditorHtml() {
             </div>
 
             <!-- Body area -->
-            <div id="typora-body-container" style="position:relative;">
-              <div id="typora-body-view" class="typora-body-view zen-article-body" onclick="enterTyporaBodyEdit()">
-                Click to write content here...
-              </div>
-              <textarea id="typora-body-editor" class="typora-body-editor" placeholder="Write markdown here..."></textarea>
-              <button id="btn-typora-done" class="btn" style="display:none; position:absolute; bottom:15px; right:15px; z-index:20; opacity:0.85; box-shadow:0 2px 8px rgba(0,0,0,0.15);" onclick="exitTyporaBodyEdit()">✔ Done Editing</button>
+            <div id="typora-body-container" style="position:relative; margin-top: 1.5rem;">
+              <textarea id="typora-body-editor" placeholder="Write markdown here..."></textarea>
             </div>
 
           </div>
         </div>
 
-        <!-- View: Split Screen -->
-        <div id="view-split" class="view-pane">
-          <div class="split-left">
-            <textarea id="split-editor-textarea" class="raw-textarea" style="width:100%; height:100%; margin:0;" oninput="syncRawToSplitAndPreview()"></textarea>
-          </div>
-          <div class="split-right zen-article-body" id="split-preview-element">
-            <!-- Preview rendered HTML -->
-          </div>
-        </div>
-
-        <!-- View: Raw Source -->
-        <div id="view-raw" class="view-pane">
-          <textarea id="raw-editor-textarea" class="raw-textarea" oninput="syncRawToSplitAndPreview()"></textarea>
-        </div>
-
-        <!-- View: Preview -->
-        <div id="view-preview" class="view-pane">
-          <div class="paper-sheet zen-article-body" id="preview-element" style="padding: 2.5rem; background:#fff; border: 1px solid #e0dcd3; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
-            <!-- Preview rendered HTML -->
+        <!-- Modern Custom Modal Backdrop -->
+        <div id="custom-modal" class="modal-backdrop" style="display: none;">
+          <div class="modal-card">
+            <h4 id="modal-title" class="modal-title">Prompt</h4>
+            <p id="modal-message" class="modal-message">Enter filename:</p>
+            <div id="modal-input-container" class="modal-input-container">
+              <input type="text" id="modal-input" class="modal-input">
+            </div>
+            <div class="modal-actions">
+              <button id="btn-modal-cancel" class="btn">Cancel</button>
+              <button id="btn-modal-ok" class="btn btn-primary">OK</button>
+            </div>
           </div>
         </div>
 
+        <!-- Hidden input for MD file import -->
+        <input type="file" id="import-file-input" accept=".md" style="display: none;">
       </div>
 
     </main>
@@ -949,11 +989,7 @@ function getEditorHtml() {
     let activePostMetadata = {};
     let activePostBody = "";
     let isSidebarCollapsed = false;
-    let activeView = "typora";
-    let articleBlocks = [];
-    let activeEditingIndex = null;
-    let ignoreBlur = false;
-    let clickedInsideEditor = false;
+    let easyMde = null;
 
     marked.setOptions({
       breaks: true,
@@ -988,66 +1024,74 @@ function getEditorHtml() {
       }
     }
 
-    // Tab pane switching logic
-    function switchView(viewName) {
-      activeView = viewName;
+    // --- Custom Modern Promise-based Dialog Modals ---
+    function showModal({ title, message, showInput = false, defaultValue = "" }) {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('custom-modal');
+        const titleEl = document.getElementById('modal-title');
+        const messageEl = document.getElementById('modal-message');
+        const inputContainer = document.getElementById('modal-input-container');
+        const inputEl = document.getElementById('modal-input');
+        const btnCancel = document.getElementById('btn-modal-cancel');
+        const btnOk = document.getElementById('btn-modal-ok');
 
-      const tabs = document.querySelectorAll('.tab-item');
-      tabs.forEach(tab => tab.classList.remove('active'));
+        titleEl.innerText = title;
+        messageEl.innerText = message;
 
-      let tabIdx = 0;
-      if (viewName === 'typora') tabIdx = 0;
-      else if (viewName === 'split') tabIdx = 1;
-      else if (viewName === 'raw') tabIdx = 2;
-      else if (viewName === 'preview') tabIdx = 3;
-      tabs[tabIdx].classList.add('active');
-
-      if (activeEditingIndex !== null) {
-        exitBlockEdit(activeEditingIndex);
-      }
-
-      const panes = document.querySelectorAll('.view-pane');
-      panes.forEach(pane => {
-        pane.classList.remove('active');
-        pane.style.display = 'none';
-      });
-
-      if (!activePost) {
-        const noPostPane = document.getElementById('view-no-post');
-        if (noPostPane) {
-          noPostPane.classList.add('active');
-          noPostPane.style.display = 'flex';
-        }
-        return;
-      }
-
-      const activePane = document.getElementById('view-' + viewName);
-      if (activePane) {
-        activePane.classList.add('active');
-        if (viewName === 'split') {
-          activePane.style.display = 'flex';
+        if (showInput) {
+          inputContainer.style.display = 'block';
+          inputEl.value = defaultValue;
+          setTimeout(() => inputEl.focus(), 50);
         } else {
-          activePane.style.display = 'block';
+          inputContainer.style.display = 'none';
         }
-      }
 
-      if (viewName === 'typora') {
-        splitRawToMetadataAndBody();
-        document.getElementById('typora-title').value = activePostMetadata.title || "";
-        document.getElementById('typora-date').value = activePostMetadata.date || "";
-        document.getElementById('typora-tags').value = (activePostMetadata.tags || []).join(", ");
-        document.getElementById('typora-desc').value = activePostMetadata.description || "";
+        if (title === 'Alert') {
+          btnCancel.style.display = 'none';
+        } else {
+          btnCancel.style.display = 'inline-block';
+        }
 
-        renderTyporaBodyHtml(activePostBody);
-        document.getElementById('typora-body-editor').value = activePostBody;
-      } else if (viewName === 'split') {
-        document.getElementById('split-editor-textarea').value = rawContent;
-        renderHtmlPreview();
-      } else if (viewName === 'raw') {
-        document.getElementById('raw-editor-textarea').value = rawContent;
-      } else if (viewName === 'preview') {
-        renderHtmlPreview();
-      }
+        modal.style.display = 'flex';
+
+        function cleanup() {
+          modal.style.display = 'none';
+          btnOk.onclick = null;
+          btnCancel.onclick = null;
+          inputEl.onkeydown = null;
+        }
+
+        btnOk.onclick = () => {
+          const val = showInput ? inputEl.value : true;
+          cleanup();
+          resolve(val);
+        };
+
+        btnCancel.onclick = () => {
+          cleanup();
+          resolve(showInput ? null : false);
+        };
+
+        inputEl.onkeydown = (e) => {
+          if (e.key === 'Enter') {
+            btnOk.click();
+          } else if (e.key === 'Escape') {
+            btnCancel.click();
+          }
+        };
+      });
+    }
+
+    function showCustomAlert(msg) {
+      return showModal({ title: 'Alert', message: msg, showInput: false });
+    }
+
+    function showCustomConfirm(msg) {
+      return showModal({ title: 'Confirm Action', message: msg, showInput: false });
+    }
+
+    function showCustomPrompt(msg, defVal = "") {
+      return showModal({ title: 'Input Required', message: msg, showInput: true, defaultValue: defVal });
     }
 
     // Load articles from backend API
@@ -1056,17 +1100,18 @@ function getEditorHtml() {
         const res = await fetch('/api/posts');
         const posts = await res.json();
         const container = document.getElementById('post-list');
-        container.innerHTML = posts.map(p => \`
-          <div class="post-item \${activePost === p.filename ? 'active' : ''}" onclick="selectPost('\${p.filename}')">
-            <strong style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">\${p.title}</strong>
-            <div style="font-size:0.75rem;color:#857a70;margin-top:0.25rem;">📅 \${p.date}</div>
-          </div>
-        \`).join('');
+        container.innerHTML = posts.map(function(p) {
+          return '<div class="post-item ' + (activePost === p.filename ? 'active' : '') + '" onclick="selectPost(\\' + p.filename + \\')">' +
+            '<strong style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + p.title + '</strong>' +
+            '<div style="font-size:0.75rem;color:#857a70;margin-top:0.25rem;">📅 ' + p.date + '</div>' +
+          '</div>';
+        }).join('');
 
         if (!activePost && posts.length > 0) {
           selectPost(posts[0].filename);
-        } else {
-          switchView(activeView);
+        } else if (!activePost) {
+          document.getElementById('view-typora').style.display = 'none';
+          document.getElementById('view-no-post').style.display = 'flex';
         }
       } catch (err) {
         console.error("Failed to load posts", err);
@@ -1085,13 +1130,25 @@ function getEditorHtml() {
       activePostMetadata = post.frontmatter;
       activePostBody = post.body;
 
-      switchView(activeView);
+      splitRawToMetadataAndBody();
+      document.getElementById('typora-title').value = activePostMetadata.title || "";
+      document.getElementById('typora-date').value = activePostMetadata.date || "";
+      document.getElementById('typora-tags').value = (activePostMetadata.tags || []).join(", ");
+      document.getElementById('typora-desc').value = activePostMetadata.description || "";
+
+      if (easyMde && easyMde.value() !== activePostBody) {
+        easyMde.value(activePostBody || "");
+      }
+
+      document.getElementById('view-typora').style.display = 'block';
+      document.getElementById('view-no-post').style.display = 'none';
+
       loadPosts();
     }
 
     // Create a new file
-    function createNewPost() {
-      const filename = prompt('Enter filename (e.g. hello-world.md):');
+    async function createNewPost() {
+      const filename = await showCustomPrompt('Enter filename (e.g. hello-world.md):');
       if (!filename) return;
       const cleanName = filename.endsWith('.md') ? filename : filename + '.md';
       activePost = cleanName;
@@ -1105,61 +1162,26 @@ function getEditorHtml() {
       activePostBody = "## New Section\\n\\nStart writing your content here...";
       rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
 
-      if (document.getElementById('split-editor-textarea')) {
-        document.getElementById('split-editor-textarea').value = rawContent;
-      }
-      if (document.getElementById('raw-editor-textarea')) {
-        document.getElementById('raw-editor-textarea').value = rawContent;
+      if (easyMde) {
+        easyMde.value(activePostBody);
       }
 
-      saveActivePost();
+      await saveActivePost();
     }
 
     // Import a local Markdown file
-    async function importLocalPost() {
-      const filePath = prompt('Enter absolute path to local Markdown file (e.g., /home/fuyu/Documents/my-doc.md):');
-      if (!filePath) return;
-
-      try {
-        const res = await fetch('/api/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filePath })
-        });
-        const data = await res.json();
-        if (data.success) {
-          activePost = data.filename;
-          document.getElementById('active-filename-display').innerText = activePost;
-          activePostMetadata = data.frontmatter;
-          activePostBody = data.body;
-          rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
-
-          switchView(activeView);
-          alert('Markdown file and its relative images imported successfully! Note: Imported content is kept in editor memory cache, click "Save" in the toolbar to save it to your blog directory.');
-        } else {
-          alert('Import failed: ' + data.error);
-        }
-      } catch (err) {
-        alert('Import error: ' + err.message);
-      }
+    function importLocalPost() {
+      document.getElementById('import-file-input').click();
     }
 
     // Save active post
     async function saveActivePost() {
-      if (!activePost) return alert('No active article selected.');
+      if (!activePost) return showCustomAlert('No active article selected.');
 
-      if (activeView === 'typora') {
-        if (activeEditingIndex !== null) {
-          exitBlockEdit(activeEditingIndex);
-        }
-        syncMetadataFieldsToRaw();
-      } else if (activeView === 'split') {
-        rawContent = document.getElementById('split-editor-textarea').value;
-        splitRawToMetadataAndBody();
-      } else if (activeView === 'raw') {
-        rawContent = document.getElementById('raw-editor-textarea').value;
-        splitRawToMetadataAndBody();
+      if (easyMde) {
+        activePostBody = easyMde.value();
       }
+      syncMetadataFieldsToRaw();
 
       try {
         const payload = {
@@ -1174,19 +1196,19 @@ function getEditorHtml() {
         const data = await res.json();
         if (data.success) {
           loadPosts();
-          alert('Post saved successfully!');
+          await showCustomAlert('Post saved successfully!');
         } else {
-          alert('Save failed: ' + data.error);
+          await showCustomAlert('Save failed: ' + data.error);
         }
       } catch (err) {
-        alert('Save error: ' + err.message);
+        await showCustomAlert('Save error: ' + err.message);
       }
     }
 
     // Permanent delete post
     async function deleteActivePost() {
-      if (!activePost) return alert('Please select a post to delete.');
-      if (!confirm(\`Are you sure you want to permanently delete this post? This action cannot be undone!\\n\\nFile: \${activePost}\`)) return;
+      if (!activePost) return showCustomAlert('Please select a post to delete.');
+      if (!await showCustomConfirm('Are you sure you want to permanently delete this post? This action cannot be undone!\\n\\nFile: ' + activePost)) return;
 
       try {
         const res = await fetch('/api/posts/' + encodeURIComponent(activePost), {
@@ -1199,14 +1221,21 @@ function getEditorHtml() {
           activePostBody = "";
           activePostMetadata = {};
           document.getElementById('active-filename-display').innerText = "No article selected";
+
+          if (easyMde) {
+            easyMde.value("");
+          }
+
+          document.getElementById('view-typora').style.display = 'none';
+          document.getElementById('view-no-post').style.display = 'flex';
+
           loadPosts();
-          alert('Post deleted successfully!');
-          switchView(activeView);
+          await showCustomAlert('Post deleted successfully!');
         } else {
-          alert('Delete failed: ' + data.error);
+          await showCustomAlert('Delete failed: ' + data.error);
         }
       } catch (err) {
-        alert('Delete error: ' + err.message);
+        await showCustomAlert('Delete error: ' + err.message);
       }
     }
 
@@ -1249,11 +1278,11 @@ function getEditorHtml() {
       let taxRaw = "";
       for (const [key, val] of Object.entries(frontmatter)) {
         if (key === 'tags') {
-          taxRaw += \`[taxonomies]\\ntags = [\${val.map(v => \`"\${v}"\`).join(', ')}]\\n\`;
+          taxRaw += "[taxonomies]\\ntags = [" + val.map(v => '"' + v + '"').join(', ') + "]\\n";
         } else if (Array.isArray(val)) {
-          fmRaw += \`\${key} = [\${val.map(v => \`"\${v}"\`).join(', ')}]\\n\`;
+          fmRaw += key + " = [" + val.map(v => '"' + v + '"').join(', ') + "]\\n";
         } else {
-          fmRaw += \`\${key} = "\${val}"\\n\`;
+          fmRaw += key + ' = "' + val + '"\\n';
         }
       }
       fmRaw += taxRaw;
@@ -1276,311 +1305,74 @@ function getEditorHtml() {
       rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
     }
 
-    function syncRawToSplitAndPreview() {
-      if (activeView === 'split') {
-        rawContent = document.getElementById('split-editor-textarea').value;
-        renderHtmlPreview();
-      } else if (activeView === 'raw') {
-        rawContent = document.getElementById('raw-editor-textarea').value;
-      }
-      splitRawToMetadataAndBody();
-    }
+    // --- EasyMDE Integration ---
 
-    function renderHtmlPreview() {
-      const { frontmatter, body } = parseFrontmatter(rawContent);
-      const htmlBody = marked.parse(body || "");
+    function initEasyMDE() {
+      const el = document.getElementById('typora-body-editor');
+      if (!el) return;
 
-      const content = \`
-        <h1>\${frontmatter.title || "Untitled Post"}</h1>
-        <div style="font-size:0.85rem;color:#857a70;margin-bottom:1.5rem;border-bottom:1px solid #e0dcd3;padding-bottom:0.5rem;">
-          📅 \${frontmatter.date || ""} &middot; 🏷️ \${(frontmatter.tags || []).join(', ')}
-        </div>
-        <div>\${htmlBody}</div>
-      \`;
-
-      if (activeView === 'split') {
-        const el = document.getElementById('split-preview-element');
-        el.innerHTML = content;
-        if (window.renderMathInElement) {
-          renderMathInElement(el, {
-            delimiters: [
-              {left: '$$', right: '$$', display: true},
-              {left: '$', right: '$', display: false},
-              {left: '\\\\(', right: '\\\\)', display: false},
-              {left: '\\\\[', right: '\\\\]', display: true}
-            ],
-            throwOnError: false
-          });
-        }
-      } else if (activeView === 'preview') {
-        const el = document.getElementById('preview-element');
-        el.innerHTML = content;
-        if (window.renderMathInElement) {
-          renderMathInElement(el, {
-            delimiters: [
-              {left: '$$', right: '$$', display: true},
-              {left: '$', right: '$', display: false},
-              {left: '\\\\(', right: '\\\\)', display: false},
-              {left: '\\\\[', right: '\\\\]', display: true}
-            ],
-            throwOnError: false
-          });
-        }
-      }
-    }
-
-    // --- Typora Mode Interactions ---
-
-    function autoResizeTextarea(textarea) {
-      textarea.style.height = 'auto';
-      textarea.style.height = (textarea.scrollHeight + 50) + 'px';
-    }
-
-    function splitMarkdownToBlocks(md) {
-      if (!md) return [];
-      const lines = md.split('\\n');
-      const blocks = [];
-      let currentBlock = [];
-      let inCodeBlock = false;
-      let inMathBlock = false;
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-
-        if (line.trim().startsWith('\`\`\`')) {
-          inCodeBlock = !inCodeBlock;
-        }
-        if (line.trim().startsWith('$$') && !inCodeBlock) {
-          inMathBlock = !inMathBlock;
-        }
-
-        if (!inCodeBlock && !inMathBlock && line.trim() === '') {
-          if (currentBlock.length > 0) {
-            blocks.push(currentBlock.join('\\n'));
-            currentBlock = [];
-          }
-        } else {
-          currentBlock.push(line);
-        }
-      }
-
-      if (currentBlock.length > 0) {
-        blocks.push(currentBlock.join('\\n'));
-      }
-
-      return blocks.filter(b => b.trim() !== '');
-    }
-
-    function renderTyporaBodyHtml(bodyText) {
-      const bodyView = document.getElementById('typora-body-view');
-
-      // If actively editing a block, do not replace layout to preserve DOM focus
-      if (activeEditingIndex !== null) return;
-
-      articleBlocks = splitMarkdownToBlocks(bodyText);
-
-      if (articleBlocks.length === 0) {
-        articleBlocks = [""];
-      }
-
-      let html = "";
-      for (let i = 0; i < articleBlocks.length; i++) {
-        const blockText = articleBlocks[i];
-        let renderedHtml = marked.parse(blockText);
-        if (!blockText.trim()) {
-          renderedHtml = "<p style='color:#857a70;font-style:italic;'>[Empty paragraph. Click to write...]</p>";
-        }
-        html += \`
-          <div class="typora-block" data-index="\${i}" onclick="handleBlockClick(event, \${i})">
-            <div class="typora-block-rendered">\${renderedHtml}</div>
-            <textarea class="typora-block-editor" style="display:none;" placeholder="Write block content..."></textarea>
-          </div>
-        \`;
-      }
-      bodyView.innerHTML = html;
-
-      // Compile math equations for full editor sheet
-      if (window.renderMathInElement) {
-        renderMathInElement(bodyView, {
-          delimiters: [
-            {left: '$$', right: '$$', display: true},
-            {left: '$', right: '$', display: false},
-            {left: '\\\\(', right: '\\\\)', display: false},
-            {left: '\\\\[', right: '\\\\]', display: true}
-          ],
-          throwOnError: false
-        });
-      }
-    }
-
-    function handleBlockClick(event, index) {
-      event.stopPropagation(); // Stop bubbling to prevent outer body edit trigger
-      if (event.target.classList.contains('typora-block-editor')) {
-        return;
-      }
-      enterBlockEdit(index);
-    }
-
-    function enterBlockEdit(index) {
-      if (activeEditingIndex !== null) {
-        if (activeEditingIndex === index) return;
-        exitBlockEdit(activeEditingIndex);
-      }
-
-      activeEditingIndex = index;
-      const blockEl = document.querySelector('.typora-block[data-index="' + index + '"]');
-      if (!blockEl) return;
-
-      const renderedEl = blockEl.querySelector('.typora-block-rendered');
-      const editorEl = blockEl.querySelector('.typora-block-editor');
-
-      renderedEl.style.display = 'none';
-      editorEl.style.display = 'block';
-      editorEl.value = articleBlocks[index] || "";
-
-      blockEl.classList.add('editing');
-      autoResizeTextarea(editorEl);
-      editorEl.focus();
-
-      setupBlockEvents(editorEl, index);
-    }
-
-    function exitBlockEdit(index) {
-      if (activeEditingIndex === null || activeEditingIndex !== index) return;
-
-      const blockEl = document.querySelector('.typora-block[data-index="' + index + '"]');
-      if (!blockEl) {
-        activeEditingIndex = null;
-        return;
-      }
-
-      const renderedEl = blockEl.querySelector('.typora-block-rendered');
-      const editorEl = blockEl.querySelector('.typora-block-editor');
-
-      const newVal = editorEl.value;
-      articleBlocks[index] = newVal;
-
-      activePostBody = articleBlocks.join('\\n\\n');
-      rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
-
-      if (newVal.trim() === "") {
-        renderedEl.innerHTML = "<p style='color:#857a70;font-style:italic;'>[Empty paragraph. Click to write...]</p>";
-      } else {
-        renderedEl.innerHTML = marked.parse(newVal);
-      }
-
-      if (window.renderMathInElement) {
-        renderMathInElement(renderedEl, {
-          delimiters: [
-            {left: '$$', right: '$$', display: true},
-            {left: '$', right: '$', display: false},
-            {left: '\\\\(', right: '\\\\)', display: false},
-            {left: '\\\\[', right: '\\\\]', display: true}
-          ],
-          throwOnError: false
-        });
-      }
-
-      editorEl.style.display = 'none';
-      renderedEl.style.display = 'block';
-      blockEl.classList.remove('editing');
-
-      activeEditingIndex = null;
-
-      // Clean empty block to maintain clean spaces
-      if (newVal.trim() === "" && articleBlocks.length > 1) {
-        articleBlocks.splice(index, 1);
-        activePostBody = articleBlocks.join('\\n\\n');
-        rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
-        renderTyporaBodyHtml(activePostBody);
-      }
-    }
-
-    function setupBlockEvents(editorEl, index) {
-      let blurTimeout;
-      editorEl.addEventListener('blur', () => {
-        if (ignoreBlur) return;
-        blurTimeout = setTimeout(() => {
-          if (clickedInsideEditor) {
-            const activeEl = document.activeElement;
-            if (!activeEl || !activeEl.classList.contains('typora-block-editor')) {
-              editorEl.focus();
+      easyMde = new EasyMDE({
+        element: el,
+        spellChecker: false,
+        autosave: {
+          enabled: false
+        },
+        status: false,
+        renderingConfig: {
+          singleLineBreaks: false,
+          codeSyntaxHighlighting: true
+        },
+        toolbar: [
+          "bold", "italic", "heading", "|",
+          "quote", "unordered-list", "ordered-list", "|",
+          "link", "image", "table", "|",
+          "preview", "side-by-side", "fullscreen", "|",
+          "guide"
+        ],
+        placeholder: "Write markdown here...",
+        minHeight: "500px",
+        previewRender: function(plainText, preview) {
+          setTimeout(() => {
+            if (typeof renderMathInElement === 'function') {
+              renderMathInElement(preview, {
+                delimiters: [
+                  {left: '$$', right: '$$', display: true},
+                  {left: '$', right: '$', display: false},
+                  {left: '\\\\(', right: '\\\\)', display: false},
+                  {left: '\\\\[', right: '\\\\]', display: true}
+                ],
+                throwOnError: false
+              });
             }
-            clickedInsideEditor = false;
-          } else {
-            exitBlockEdit(index);
-          }
-        }, 120);
-      });
-
-      editorEl.addEventListener('input', (e) => {
-        autoResizeTextarea(e.target);
-      });
-
-      editorEl.addEventListener('keydown', (e) => {
-        // Enter key (without Shift) creates and focuses a new paragraph block below
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          clearTimeout(blurTimeout);
-
-          ignoreBlur = true;
-          const currentVal = editorEl.value;
-          articleBlocks[index] = currentVal;
-
-          articleBlocks.splice(index + 1, 0, "");
-          activePostBody = articleBlocks.join('\\n\\n');
-          rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
-
-          renderTyporaBodyHtml(activePostBody);
-
-          enterBlockEdit(index + 1);
-          ignoreBlur = false;
+          }, 10);
+          return marked.parse(plainText);
         }
+      });
 
-        // Backspace on empty text deletes the paragraph and navigates to the previous block
-        if (e.key === 'Backspace' && editorEl.value === '') {
-          e.preventDefault();
-          clearTimeout(blurTimeout);
+      // EasyMDE change hook
+      easyMde.codemirror.on("change", () => {
+        activePostBody = easyMde.value();
+        syncMetadataFieldsToRaw();
+      });
 
-          ignoreBlur = true;
-          articleBlocks.splice(index, 1);
-          if (articleBlocks.length === 0) {
-            articleBlocks = [""];
+      // EasyMDE paste hook for images
+      easyMde.codemirror.on("paste", async (cm, e) => {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (let item of items) {
+          if (item.kind === 'file' && item.type.startsWith('image/')) {
+            e.preventDefault();
+            const file = item.getAsFile();
+            await uploadPastedImageEasyMDE(file, cm);
           }
-          activePostBody = articleBlocks.join('\\n\\n');
-          rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
-
-          renderTyporaBodyHtml(activePostBody);
-
-          const prevIdx = index > 0 ? index - 1 : 0;
-          enterBlockEdit(prevIdx);
-
-          const prevEditor = document.querySelector('.typora-block[data-index="' + prevIdx + '"] .typora-block-editor');
-          if (prevEditor) {
-            prevEditor.focus();
-            const len = prevEditor.value.length;
-            prevEditor.setSelectionRange(len, len);
-          }
-          ignoreBlur = false;
         }
       });
     }
 
-    function enterTyporaBodyEdit() {
-      // Default to edit the last block (or first block if empty) when outer sheet whitespace is clicked
-      const idx = articleBlocks.length > 0 ? articleBlocks.length - 1 : 0;
-      enterBlockEdit(idx);
-    }
-
-    // --- Image pasting handle ---
-
-    async function uploadPastedImage(file, textareaEl) {
-      const placeholder = \`\\n![Uploading \${file.name}...]()\\n\`;
-      const originalVal = textareaEl.value;
-      const startPos = textareaEl.selectionStart;
-      const endPos = textareaEl.selectionEnd;
-
-      textareaEl.value = originalVal.substring(0, startPos) + placeholder + originalVal.substring(endPos);
+    async function uploadPastedImageEasyMDE(file, cm) {
+      const placeholder = "\\n![Uploading " + file.name + "...]()\\n";
+      const doc = cm.getDoc();
+      const cursor = doc.getCursor();
+      doc.replaceRange(placeholder, cursor);
 
       try {
         const res = await fetch('/api/images', {
@@ -1590,68 +1382,70 @@ function getEditorHtml() {
         });
         const data = await res.json();
         if (data.success) {
-          const finalMarkdown = \`\\n![pasted-image](\${data.localPath})\\n\`;
-          textareaEl.value = textareaEl.value.replace(placeholder, finalMarkdown);
+          const finalMarkdown = "\\n![pasted-image](" + data.localPath + ")\\n";
+          const content = doc.getValue();
+          const newContent = content.replace(placeholder, finalMarkdown);
+          doc.setValue(newContent);
 
-          if (textareaEl.id === 'typora-body-editor') {
-            activePostBody = textareaEl.value;
-            rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
-          } else if (textareaEl.id === 'split-editor-textarea' || textareaEl.id === 'raw-editor-textarea') {
-            rawContent = textareaEl.value;
-            splitRawToMetadataAndBody();
-          }
-
-          autoResizeTextarea(textareaEl);
+          activePostBody = easyMde.value();
+          rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
         } else {
-          alert('Upload failed: ' + data.error);
-          textareaEl.value = textareaEl.value.replace(placeholder, '');
+          await showCustomAlert('Upload failed: ' + data.error);
+          const content = doc.getValue();
+          doc.setValue(content.replace(placeholder, ''));
         }
       } catch (err) {
-        alert('Upload connection error: ' + err.message);
-        textareaEl.value = textareaEl.value.replace(placeholder, '');
+        await showCustomAlert('Upload connection error: ' + err.message);
+        const content = doc.getValue();
+        doc.setValue(content.replace(placeholder, ''));
       }
     }
 
     function setupPasteHooks() {
-      const textareas = ['typora-body-editor', 'split-editor-textarea', 'raw-editor-textarea'];
-      textareas.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.addEventListener('paste', async (e) => {
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-            for (let item of items) {
-              if (item.kind === 'file' && item.type.startsWith('image/')) {
-                e.preventDefault();
-                const file = item.getAsFile();
-                await uploadPastedImage(file, e.target);
-              }
-            }
-          });
-
-          if (id === 'typora-body-editor') {
-            let renderTimeout;
-            el.addEventListener('input', (e) => {
-              autoResizeTextarea(e.target);
-              clearTimeout(renderTimeout);
-              renderTimeout = setTimeout(() => {
-                renderTyporaBodyHtml(e.target.value);
-              }, 150);
-            });
-          }
-        }
-      });
+      // No extra textareas to attach paste hooks since we only keep EasyMDE Typora Live view
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      initEasyMDE();
       loadPosts();
-      setupPasteHooks();
 
-      // Capture clicks on the paper sheet (excluding metadata form) to prevent editor deactivation
-      document.querySelector('.paper-sheet').addEventListener('mousedown', (e) => {
-        if (!e.target.closest('.typora-metadata-container')) {
-          clickedInsideEditor = true;
-        }
-      });
+      // Bind file import change listener
+      const fileInput = document.getElementById('import-file-input');
+      if (fileInput) {
+        fileInput.addEventListener('change', async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = async (evt) => {
+            const fileContent = evt.target.result;
+            const { frontmatter, body } = parseFrontmatter(fileContent);
+
+            activePost = file.name;
+            document.getElementById('active-filename-display').innerText = activePost;
+            activePostMetadata = frontmatter;
+            activePostBody = body;
+
+            document.getElementById('typora-title').value = activePostMetadata.title || "";
+            document.getElementById('typora-date').value = activePostMetadata.date || "";
+            document.getElementById('typora-tags').value = (activePostMetadata.tags || []).join(", ");
+            document.getElementById('typora-desc').value = activePostMetadata.description || "";
+
+            if (easyMde) {
+              easyMde.value(activePostBody || "");
+            }
+
+            document.getElementById('view-typora').style.display = 'block';
+            document.getElementById('view-no-post').style.display = 'none';
+
+            // Reset input
+            fileInput.value = '';
+
+            await showCustomAlert('Markdown file imported successfully! Click "Save" in the toolbar to save it to your blog directory.');
+          };
+          reader.readAsText(file);
+        });
+      }
 
       window.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
