@@ -1,10 +1,14 @@
-+++
-title = "Make 与 Just 对比"
-date = "2026-06-18"
-description = "当我们在现代项目里写满 .PHONY 时，也许是时候告别老伙计 Make，拥抱更纯粹的任务运行器 Just 了。"
-[taxonomies]
-tags = ["Linux"", "DevOps", "Tooling"]
-+++
+---
+title: "Make 与 Just 对比"
+date: "2026-06-18"
+description: "当我们在现代项目里写满 .PHONY 时，也许是时候告别老伙计 Make，拥抱更纯粹的任务运行器 Just 了。"
+taxonomies:
+  tags:
+    - Linux
+    - ,
+    - ,
+---
+
 无论是在维护后端的微服务，还是在折腾前端项目，我们常常会习惯性地在项目根目录下放一个 Makefile。把繁琐的构建、测试、部署等操作封装起来，只需敲下 make build 或 make test 就能搞定一切。这种做法几乎成了程序员的一种默认共识，极大地简化了日常的开发流程。
 
 ![pasted-image](/tmp/raw/images/image.png)

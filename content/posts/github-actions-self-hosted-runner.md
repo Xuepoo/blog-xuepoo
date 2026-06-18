@@ -1,10 +1,14 @@
-+++
-title = "GitHub Actions 使用自托管的 Runner"
-description = "探讨如何为 GitHub Actions 配置与使用 Self-Hosted Runner（自托管运行器），包括安全考量、安装步骤以及在私有仓库和企业级项目中的最佳实践。"
-date = "2026-06-18"
-[taxonomies]
-tags = ["CI-CD", "GitHub", "Linux", "DevOps"]
-+++
+---
+title: "GitHub Actions 使用自托管的 Runner"
+description: "探讨如何为 GitHub Actions 配置与使用 Self-Hosted Runner（自托管运行器），包括安全考量、安装步骤以及在私有仓库和企业级项目中的最佳实践。"
+date: "2026-06-18"
+taxonomies:
+  tags:
+    - CI-CD
+    - GitHub
+    - Linux
+    - DevOps
+---
 
 在进行 CI/CD 流水线构建时，GitHub 默认提供的 GitHub-Hosted Runner（托管运行器）通常能满足绝大多数中小项目的构建需求。然而，对于大型项目、需要依赖特定硬件加速的编译任务，或是由于安全要求必须在内网环境中拉取内部服务的项目，使用 **Self-Hosted Runner（自托管运行器）** 是最优的技术选型。
 

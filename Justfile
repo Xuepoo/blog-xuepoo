@@ -2,8 +2,10 @@ default:
     @just --list
 
 edit:
-    @echo "=== Starting Dev API & Zola Serve ==="
-    @node scripts/editor-server.js
+    @echo "=== Opening Obsidian ==="
+    @xdg-open "obsidian://open?path=/mnt/data/Workspace/Projects/xuepoo/xuepoo-blog" || echo "Obsidian CLI not found, please open manually."
+    @echo "=== Starting Zola Serve ==="
+    @zola serve -p 8085
 
 status:
     @echo "=== Checking repository status ==="
