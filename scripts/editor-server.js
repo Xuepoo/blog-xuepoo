@@ -388,6 +388,10 @@ function getEditorHtml() {
   <link rel="stylesheet" href="/giallo-light.css">
   <!-- Load local markdown renderer -->
   <script src="/tmp/marked.min.js"></script>
+  <!-- Load KaTeX math library -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
 
   <style>
     /* Global layout style referencing Obsidian & Typora classic look */
@@ -793,7 +797,7 @@ function getEditorHtml() {
 
         <!-- Tabs selector -->
         <div class="view-tabs">
-          <button class="tab-item active" onclick="switchView('typora')">Typora Live</button>
+          <button class="tab-item active" onclick="switchView('typora')">Live</button>
           <button class="tab-item" onclick="switchView('split')">Split Screen</button>
           <button class="tab-item" onclick="switchView('raw')">Raw Source</button>
           <button class="tab-item" onclick="switchView('preview')">Preview</button>
@@ -844,7 +848,8 @@ function getEditorHtml() {
               <div id="typora-body-view" class="typora-body-view zen-article-body" onclick="enterTyporaBodyEdit()">
                 Click to write content here...
               </div>
-              <textarea id="typora-body-editor" class="typora-body-editor" onblur="exitTyporaBodyEdit()" placeholder="Write markdown here..."></textarea>
+              <textarea id="typora-body-editor" class="typora-body-editor" placeholder="Write markdown here..."></textarea>
+              <button id="btn-typora-done" class="btn" style="display:none; position:absolute; bottom:15px; right:15px; z-index:20; opacity:0.85; box-shadow:0 2px 8px rgba(0,0,0,0.15);" onclick="exitTyporaBodyEdit()">✔ Done Editing</button>
             </div>
 
           </div>
@@ -1181,9 +1186,33 @@ function getEditorHtml() {
       \`;
 
       if (activeView === 'split') {
-        document.getElementById('split-preview-element').innerHTML = content;
+        const el = document.getElementById('split-preview-element');
+        el.innerHTML = content;
+        if (window.renderMathInElement) {
+          renderMathInElement(el, {
+            delimiters: [
+              {left: '$$', right: '$$', display: true},
+              {left: '$', right: '$', display: false},
+              {left: '\\\\(', right: '\\\\)', display: false},
+              {left: '\\\\[', right: '\\\\]', display: true}
+            ],
+            throwOnError: false
+          });
+        }
       } else if (activeView === 'preview') {
-        document.getElementById('preview-element').innerHTML = content;
+        const el = document.getElementById('preview-element');
+        el.innerHTML = content;
+        if (window.renderMathInElement) {
+          renderMathInElement(el, {
+            delimiters: [
+              {left: '$$', right: '$$', display: true},
+              {left: '$', right: '$', display: false},
+              {left: '\\\\(', right: '\\\\)', display: false},
+              {left: '\\\\[', right: '\\\\]', display: true}
+            ],
+            throwOnError: false
+          });
+        }
       }
     }
 
@@ -1196,6 +1225,17 @@ function getEditorHtml() {
       } else {
         bodyView.innerHTML = marked.parse(bodyText);
       }
+      if (window.renderMathInElement) {
+        renderMathInElement(bodyView, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\\\(', right: '\\\\)', display: false},
+            {left: '\\\\[', right: '\\\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
     }
 
     function autoResizeTextarea(textarea) {
@@ -1206,9 +1246,11 @@ function getEditorHtml() {
     function enterTyporaBodyEdit() {
       const viewEl = document.getElementById('typora-body-view');
       const editorEl = document.getElementById('typora-body-editor');
+      const doneBtn = document.getElementById('btn-typora-done');
 
       viewEl.style.display = 'none';
       editorEl.style.display = 'block';
+      if (doneBtn) doneBtn.style.display = 'inline-flex';
       editorEl.value = activePostBody;
       autoResizeTextarea(editorEl);
       editorEl.focus();
@@ -1217,6 +1259,7 @@ function getEditorHtml() {
     function exitTyporaBodyEdit() {
       const viewEl = document.getElementById('typora-body-view');
       const editorEl = document.getElementById('typora-body-editor');
+      const doneBtn = document.getElementById('btn-typora-done');
 
       activePostBody = editorEl.value;
       rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
@@ -1224,6 +1267,7 @@ function getEditorHtml() {
       renderTyporaBodyHtml(activePostBody);
 
       editorEl.style.display = 'none';
+      if (doneBtn) doneBtn.style.display = 'none';
       viewEl.style.display = 'block';
     }
 

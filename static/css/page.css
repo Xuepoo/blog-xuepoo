@@ -585,3 +585,85 @@ body {
     transform: translateY(0);
   }
 }
+
+/* Table styles matching Zen aesthetics */
+.zen-article-body table {
+  width: 100%;
+  margin: 1.5rem 0;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.zen-article-body th {
+  background-color: var(--code-bg);
+  border-bottom: 2px solid var(--border-color);
+  padding: 10px 12px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--text-color);
+}
+.zen-article-body td {
+  border-bottom: 1px solid var(--border-color);
+  padding: 10px 12px;
+  color: var(--text-color);
+}
+.zen-article-body tr:hover td {
+  background-color: var(--code-bg);
+}
+
+/* Footnotes styling (Standard markdown and Zola specific) */
+.zen-article-body .footnotes,
+.zen-article-body .footnote-definition {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.zen-article-body .footnotes {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+.zen-article-body .footnotes ol {
+  padding-left: 20px;
+}
+.zen-article-body .footnotes li {
+  margin-bottom: 0.5rem;
+}
+.zen-article-body .footnote-definition {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.zen-article-body .footnote-definition p {
+  margin: 0;
+  display: inline;
+}
+.zen-article-body .footnote-definition-label,
+.zen-article-body .footnote-definition sup {
+  font-weight: bold;
+  color: var(--text-muted);
+}
+/* Divider line before first footnote definition in Zola */
+.zen-article-body .footnote-definition:first-of-type {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+.zen-article-body sup a,
+.zen-article-body .footnote-reference a {
+  text-decoration: none;
+  font-weight: bold;
+  color: var(--text-muted);
+  padding: 0 2px;
+}
+.zen-article-body sup a:hover,
+.zen-article-body .footnote-reference a:hover {
+  color: var(--accent-color);
+}
+
+/* Task lists / Checkboxes styling */
+.zen-article-body ul li input[type="checkbox"] {
+  margin-right: 8px;
+  vertical-align: middle;
+}
