@@ -272,7 +272,7 @@ const server = http.createServer((req, res) => {
         return;
       }
       const posts = files
-        .filter((f) => f.endsWith(".md"))
+        .filter((f) => f.endsWith(".md") && f !== "_index.md")
         .map((f) => {
           const content = fs.readFileSync(path.join(POSTS_DIR, f), "utf-8");
           const { frontmatter } = parseFrontmatter(content);
@@ -865,6 +865,74 @@ function getEditorHtml() {
     ::-webkit-scrollbar-thumb:hover {
       background: #a8a094;
     }
+
+    /* Tabs Bar Styles */
+    #tabs-bar {
+      display: flex;
+      background: #f5f2eb;
+      border-bottom: 1px solid #e0dcd3;
+      padding: 6px 16px 0;
+      gap: 4px;
+      overflow-x: auto;
+      flex-shrink: 0;
+    }
+    .editor-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: #e8e4da;
+      border: 1px solid #d5cfc5;
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      font-size: 0.8rem;
+      color: #7c6f64;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+      max-width: 180px;
+    }
+    .editor-tab:hover {
+      background: #faf7f2;
+      color: #3c3836;
+    }
+    .editor-tab.active {
+      background: #fdfcf7;
+      border-color: #e0dcd3;
+      border-bottom: 1px solid #fdfcf7;
+      color: #2c2c2a;
+      font-weight: 600;
+      margin-bottom: -1px;
+      z-index: 2;
+    }
+    .tab-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tab-close {
+      font-size: 0.75rem;
+      color: #a89984;
+      border-radius: 50%;
+      width: 14px;
+      height: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .tab-close:hover {
+      background: #d5cfc5;
+      color: #3c3836;
+    }
+    .tab-dirty-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: #ff3b30;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -908,6 +976,9 @@ function getEditorHtml() {
         </div>
       </div>
 
+      <!-- Open Tabs Bar -->
+      <div id="tabs-bar" style="display: none;"></div>
+
       <div id="workspace">
 
         <!-- View: No Post Selected Placeholder -->
@@ -935,19 +1006,19 @@ function getEditorHtml() {
               <div id="typora-metadata-form" class="metadata-form">
                 <div class="meta-row">
                   <label>Title</label>
-                  <input type="text" id="typora-title" class="meta-input" oninput="syncMetadataFieldsToRaw()">
+                  <input type="text" id="typora-title" class="meta-input" oninput="onMetadataInput()">
                 </div>
                 <div class="meta-row">
                   <label>Date</label>
-                  <input type="date" id="typora-date" class="meta-input" oninput="syncMetadataFieldsToRaw()">
+                  <input type="date" id="typora-date" class="meta-input" oninput="onMetadataInput()">
                 </div>
                 <div class="meta-row">
                   <label>Tags</label>
-                  <input type="text" id="typora-tags" class="meta-input" placeholder="e.g. Rust, DevOps" oninput="syncMetadataFieldsToRaw()">
+                  <input type="text" id="typora-tags" class="meta-input" placeholder="e.g. Rust, DevOps" oninput="onMetadataInput()">
                 </div>
                 <div class="meta-row">
                   <label>Description</label>
-                  <input type="text" id="typora-desc" class="meta-input" oninput="syncMetadataFieldsToRaw()">
+                  <input type="text" id="typora-desc" class="meta-input" oninput="onMetadataInput()">
                 </div>
               </div>
             </div>
@@ -984,6 +1055,7 @@ function getEditorHtml() {
   </div>
 
   <script>
+    let openTabs = {};
     let activePost = null;
     let rawContent = "";
     let activePostMetadata = {};
@@ -1101,8 +1173,14 @@ function getEditorHtml() {
         const posts = await res.json();
         const container = document.getElementById('post-list');
         container.innerHTML = posts.map(function(p) {
-          return '<div class="post-item ' + (activePost === p.filename ? 'active' : '') + '" onclick="selectPost(&apos;' + p.filename + '&apos;)">' +
-            '<strong style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + p.title + '</strong>' +
+          const isActive = activePost === p.filename;
+          const isDirty = openTabs[p.filename] && openTabs[p.filename].isDirty;
+          const dirtyIndicator = isDirty ? ' <span style="display:inline-block;width:6px;height:6px;background:#ff3b30;border-radius:50%;margin-left:4px;"></span>' : '';
+          return '<div class="post-item ' + (isActive ? 'active' : '') + '" onclick="selectPost(&apos;' + p.filename + '&apos;)">' +
+            '<strong style="display:flex;align-items:center;justify-content:space-between;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+              '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + p.title + '</span>' +
+              dirtyIndicator +
+            '</strong>' +
             '<div style="font-size:0.75rem;color:#857a70;margin-top:0.25rem;">📅 ' + p.date + '</div>' +
           '</div>';
         }).join('');
@@ -1120,29 +1198,151 @@ function getEditorHtml() {
 
     // Select article post
     async function selectPost(filename) {
+      await openTab(filename);
+    }
+
+    // Obsidian-style Tab operations
+    async function openTab(filename) {
+      // If switching tabs, sync current fields to the old active tab first
+      if (activePost && openTabs[activePost]) {
+        syncMetadataAndBodyToTab(activePost);
+      }
+
       activePost = filename;
       document.getElementById('active-filename-display').innerText = filename;
 
-      const res = await fetch('/api/posts/' + encodeURIComponent(filename));
-      const post = await res.json();
+      // If the tab is not in memory, fetch it from server
+      if (!openTabs[filename]) {
+        const res = await fetch('/api/posts/' + encodeURIComponent(filename));
+        if (res.status === 200) {
+          const post = await res.json();
+          openTabs[filename] = {
+            filename: filename,
+            frontmatter: post.frontmatter || {},
+            body: post.body || "",
+            isDirty: false
+          };
+        } else {
+          // If server failed (e.g. newly created draft not on server yet)
+          openTabs[filename] = {
+            filename: filename,
+            frontmatter: { title: filename.replace(/\\.md$/, ""), date: new Date().toISOString().split('T')[0], tags: [], description: "" },
+            body: "",
+            isDirty: true
+          };
+        }
+      }
 
-      rawContent = stringifyFrontmatter(post.frontmatter, post.body);
-      activePostMetadata = post.frontmatter;
-      activePostBody = post.body;
+      const tabData = openTabs[filename];
+      activePostMetadata = tabData.frontmatter;
+      activePostBody = tabData.body;
 
-      splitRawToMetadataAndBody();
       document.getElementById('typora-title').value = activePostMetadata.title || "";
       document.getElementById('typora-date').value = activePostMetadata.date || "";
       document.getElementById('typora-tags').value = (activePostMetadata.tags || []).join(", ");
       document.getElementById('typora-desc').value = activePostMetadata.description || "";
 
-      if (easyMde && easyMde.value() !== activePostBody) {
+      if (easyMde) {
+        easyMde.codemirror.off("change", onEasyMdeChange);
         easyMde.value(activePostBody || "");
+        easyMde.codemirror.on("change", onEasyMdeChange);
       }
 
       document.getElementById('view-typora').style.display = 'block';
       document.getElementById('view-no-post').style.display = 'none';
 
+      renderTabs();
+      loadPosts();
+
+      if (easyMde && easyMde.codemirror) {
+        setTimeout(() => {
+          easyMde.codemirror.refresh();
+        }, 50);
+      }
+    }
+
+    function syncMetadataAndBodyToTab(filename) {
+      if (!openTabs[filename]) return;
+      openTabs[filename].frontmatter.title = document.getElementById('typora-title').value;
+      openTabs[filename].frontmatter.date = document.getElementById('typora-date').value;
+      openTabs[filename].frontmatter.tags = document.getElementById('typora-tags').value.split(',').map(s => s.trim()).filter(Boolean);
+      openTabs[filename].frontmatter.description = document.getElementById('typora-desc').value;
+      if (easyMde) {
+        openTabs[filename].body = easyMde.value();
+      }
+    }
+
+    function onMetadataInput() {
+      if (!activePost || !openTabs[activePost]) return;
+      syncMetadataAndBodyToTab(activePost);
+      if (!openTabs[activePost].isDirty) {
+        openTabs[activePost].isDirty = true;
+        renderTabs();
+        loadPosts();
+      }
+    }
+
+    function onEasyMdeChange() {
+      if (!activePost || !openTabs[activePost]) return;
+      const currentVal = easyMde.value();
+      if (openTabs[activePost].body !== currentVal) {
+        openTabs[activePost].body = currentVal;
+        if (!openTabs[activePost].isDirty) {
+          openTabs[activePost].isDirty = true;
+          renderTabs();
+          loadPosts();
+        }
+      }
+    }
+
+    function renderTabs() {
+      const bar = document.getElementById('tabs-bar');
+      const keys = Object.keys(openTabs);
+      if (keys.length === 0) {
+        bar.style.display = 'none';
+        return;
+      }
+      bar.style.display = 'flex';
+      bar.innerHTML = keys.map(filename => {
+        const tab = openTabs[filename];
+        const isActive = filename === activePost;
+        const displayTitle = tab.frontmatter.title || filename;
+        const dirtyDot = tab.isDirty ? '<span class="tab-dirty-dot" title="Unsaved changes"></span>' : '';
+        return '<div class="editor-tab ' + (isActive ? 'active' : '') + '" onclick="openTab(&apos;' + filename + '&apos;)">' +
+          dirtyDot +
+          '<span class="tab-title" title="' + filename + '">' + displayTitle + '</span>' +
+          '<span class="tab-close" onclick="closeTab(&apos;' + filename + '&apos;, event)">×</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    async function closeTab(filename, event) {
+      if (event) event.stopPropagation();
+      const tab = openTabs[filename];
+      if (!tab) return;
+
+      if (tab.isDirty) {
+        const title = tab.frontmatter.title || filename;
+        if (!await showCustomConfirm('Discard unsaved changes for "' + title + '"?')) {
+          return;
+        }
+      }
+
+      delete openTabs[filename];
+
+      if (activePost === filename) {
+        const remaining = Object.keys(openTabs);
+        if (remaining.length > 0) {
+          await openTab(remaining[remaining.length - 1]);
+        } else {
+          activePost = null;
+          document.getElementById('active-filename-display').innerText = "No article selected";
+          document.getElementById('view-typora').style.display = 'none';
+          document.getElementById('view-no-post').style.display = 'flex';
+        }
+      }
+
+      renderTabs();
       loadPosts();
     }
 
@@ -1151,22 +1351,28 @@ function getEditorHtml() {
       const filename = await showCustomPrompt('Enter filename (e.g. hello-world.md):');
       if (!filename) return;
       const cleanName = filename.endsWith('.md') ? filename : filename + '.md';
-      activePost = cleanName;
 
-      activePostMetadata = {
-        title: "New Post Title",
-        date: new Date().toISOString().split('T')[0],
-        tags: ["draft"],
-        description: "This is a new article draft."
-      };
-      activePostBody = "## New Section\\n\\nStart writing your content here...";
-      rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
-
-      if (easyMde) {
-        easyMde.value(activePostBody);
+      const res = await fetch('/api/posts');
+      const posts = await res.json();
+      const exists = posts.some(p => p.filename.toLowerCase() === cleanName.toLowerCase());
+      if (exists) {
+        await showCustomAlert('A post with filename "' + cleanName + '" already exists.');
+        return;
       }
 
-      await saveActivePost();
+      openTabs[cleanName] = {
+        filename: cleanName,
+        frontmatter: {
+          title: "New Post Title",
+          date: new Date().toISOString().split('T')[0],
+          tags: ["draft"],
+          description: "This is a new article draft."
+        },
+        body: "## New Section\\n\\nStart writing your content here...",
+        isDirty: true
+      };
+
+      await openTab(cleanName);
     }
 
     // Import a local Markdown file
@@ -1178,15 +1384,13 @@ function getEditorHtml() {
     async function saveActivePost() {
       if (!activePost) return showCustomAlert('No active article selected.');
 
-      if (easyMde) {
-        activePostBody = easyMde.value();
-      }
-      syncMetadataFieldsToRaw();
+      syncMetadataAndBodyToTab(activePost);
+      const tabData = openTabs[activePost];
 
       try {
         const payload = {
-          frontmatter: activePostMetadata,
-          body: activePostBody
+          frontmatter: tabData.frontmatter,
+          body: tabData.body
         };
         const res = await fetch('/api/posts/' + encodeURIComponent(activePost), {
           method: 'POST',
@@ -1195,6 +1399,8 @@ function getEditorHtml() {
         });
         const data = await res.json();
         if (data.success) {
+          tabData.isDirty = false;
+          renderTabs();
           loadPosts();
           await showCustomAlert('Post saved successfully!');
         } else {
@@ -1216,18 +1422,23 @@ function getEditorHtml() {
         });
         const data = await res.json();
         if (data.success) {
+          const deletedFile = activePost;
+          delete openTabs[deletedFile];
+
           activePost = null;
-          rawContent = "";
-          activePostBody = "";
-          activePostMetadata = {};
           document.getElementById('active-filename-display').innerText = "No article selected";
 
           if (easyMde) {
             easyMde.value("");
           }
 
-          document.getElementById('view-typora').style.display = 'none';
-          document.getElementById('view-no-post').style.display = 'flex';
+          const remaining = Object.keys(openTabs);
+          if (remaining.length > 0) {
+            await openTab(remaining[remaining.length - 1]);
+          } else {
+            document.getElementById('view-typora').style.display = 'none';
+            document.getElementById('view-no-post').style.display = 'flex';
+          }
 
           loadPosts();
           await showCustomAlert('Post deleted successfully!');
@@ -1350,10 +1561,7 @@ function getEditorHtml() {
       });
 
       // EasyMDE change hook
-      easyMde.codemirror.on("change", () => {
-        activePostBody = easyMde.value();
-        syncMetadataFieldsToRaw();
-      });
+      easyMde.codemirror.on("change", onEasyMdeChange);
 
       // EasyMDE paste hook for images
       easyMde.codemirror.on("paste", async (cm, e) => {
@@ -1388,6 +1596,14 @@ function getEditorHtml() {
           doc.setValue(newContent);
 
           activePostBody = easyMde.value();
+          if (activePost && openTabs[activePost]) {
+            openTabs[activePost].body = activePostBody;
+            if (!openTabs[activePost].isDirty) {
+              openTabs[activePost].isDirty = true;
+              renderTabs();
+              loadPosts();
+            }
+          }
           rawContent = stringifyFrontmatter(activePostMetadata, activePostBody);
         } else {
           await showCustomAlert('Upload failed: ' + data.error);
@@ -1421,22 +1637,15 @@ function getEditorHtml() {
             const fileContent = evt.target.result;
             const { frontmatter, body } = parseFrontmatter(fileContent);
 
-            activePost = file.name;
-            document.getElementById('active-filename-display').innerText = activePost;
-            activePostMetadata = frontmatter;
-            activePostBody = body;
+            const filename = file.name;
+            openTabs[filename] = {
+              filename: filename,
+              frontmatter: frontmatter || {},
+              body: body || "",
+              isDirty: true
+            };
 
-            document.getElementById('typora-title').value = activePostMetadata.title || "";
-            document.getElementById('typora-date').value = activePostMetadata.date || "";
-            document.getElementById('typora-tags').value = (activePostMetadata.tags || []).join(", ");
-            document.getElementById('typora-desc').value = activePostMetadata.description || "";
-
-            if (easyMde) {
-              easyMde.value(activePostBody || "");
-            }
-
-            document.getElementById('view-typora').style.display = 'block';
-            document.getElementById('view-no-post').style.display = 'none';
+            await openTab(filename);
 
             // Reset input
             fileInput.value = '';
