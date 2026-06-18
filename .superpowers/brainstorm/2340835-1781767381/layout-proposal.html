@@ -1,0 +1,234 @@
+<h2>本地博客编辑器 & Justfile 任务流设计方案</h2>
+<p class="subtitle">通过网页端直接编辑博客文章，配合本地 API 与 Justfile 任务流实现高效维护</p>
+
+<div class="section">
+  <h3>1. 网页端本地编辑器界面布局</h3>
+  <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-secondary)">
+    当在本地启动服务时，在浏览器中可操作的可视化编辑系统原型：
+  </p>
+
+  <div class="mockup">
+    <div class="mockup-header">本地预览网页: http://localhost:8085/_edit</div>
+    <div class="mockup-body" style="padding: 0">
+      <!-- Main layout -->
+      <div style="display: flex; min-height: 450px">
+        <!-- Left Sidebar: Post list & Metadata -->
+        <div
+          style="
+            width: 240px;
+            background: var(--bg-primary);
+            border-right: 1px solid var(--border);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+          "
+        >
+          <h4 class="label" style="margin-bottom: 0.25rem">文章列表</h4>
+          <div
+            style="
+              background: var(--bg-secondary);
+              border: 1.5px solid var(--accent);
+              border-radius: 6px;
+              padding: 0.5rem;
+              font-size: 0.8rem;
+              cursor: pointer;
+            "
+          >
+            <strong>📝 github-actions-runner.md</strong>
+            <div style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.25rem">
+              自托管 runner 使用指南
+            </div>
+          </div>
+          <div
+            style="
+              background: var(--bg-secondary);
+              border: 1px solid var(--border);
+              border-radius: 6px;
+              padding: 0.5rem;
+              font-size: 0.8rem;
+              color: var(--text-secondary);
+              cursor: pointer;
+            "
+          >
+            📄 hello-world.md
+            <div style="font-size: 0.75rem; margin-top: 0.25rem">第一篇博客文章</div>
+          </div>
+
+          <button class="mock-button" style="width: 100%; margin-top: auto; font-size: 0.8rem">
+            + 新建文章
+          </button>
+
+          <div
+            style="
+              border-top: 1px solid var(--border);
+              padding-top: 0.75rem;
+              margin-top: 0.5rem;
+              display: flex;
+              flex-direction: column;
+              gap: 0.5rem;
+            "
+          >
+            <h4 class="label" style="margin-bottom: 0.25rem">元数据属性 (Frontmatter)</h4>
+            <input
+              class="mock-input"
+              style="font-size: 0.75rem"
+              value="自托管 runner 使用指南"
+              placeholder="文章标题"
+            />
+            <input
+              class="mock-input"
+              style="font-size: 0.75rem"
+              value="CI-CD, Linux"
+              placeholder="标签 (逗号分隔)"
+            />
+            <input class="mock-input" style="font-size: 0.75rem" value="2026-06-18" type="date" />
+          </div>
+        </div>
+
+        <!-- Middle Column: Editor (Markdown) -->
+        <div style="flex: 1.2; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem">
+          <div style="display: flex; justify-content: space-between; align-items: center">
+            <h4 class="label">Markdown 内容编辑器</h4>
+            <div style="display: flex; gap: 0.5rem">
+              <button class="mock-button" style="background: var(--success); font-size: 0.8rem">
+                💾 保存修改
+              </button>
+              <button
+                class="mock-button"
+                style="background: var(--accent); font-size: 0.8rem"
+                onclick="alert('拖入或选择图片：会自动放到本地临时文件夹')"
+              >
+                + 插入图片
+              </button>
+            </div>
+          </div>
+          <textarea
+            class="mock-input"
+            style="
+              flex: 1;
+              font-family: monospace;
+              font-size: 0.8rem;
+              resize: none;
+              padding: 0.75rem;
+              line-height: 1.4;
+            "
+            readonly
+          >
++++
+title = "自托管 runner 使用指南"
+date = 2026-06-18
+[taxonomies]
+tags = ["CI-CD", "Linux"]
++++
+
+这是文章的正文部分。
+
+![我的示意图](https://cdn.xuepoo.xyz/blog/posts/github-actions-runner/my-illustration-1.webp)
+
+我们可以在这里直接进行排版修改与编辑...</textarea
+          >
+        </div>
+
+        <!-- Right Column: Live Preview -->
+        <div
+          style="
+            flex: 1;
+            background: #fcfaf2;
+            border-left: 1px solid var(--border);
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            color: #2c2c2a;
+          "
+        >
+          <div
+            style="border-bottom: 1px dashed #d0cbd0; padding-bottom: 0.5rem; margin-bottom: 0.5rem"
+          >
+            <span style="font-size: 0.7rem; text-transform: uppercase; color: #8a8370"
+              >预览窗口</span
+            >
+            <h1
+              style="font-size: 1.2rem; margin-top: 0.25rem; font-family: serif; font-weight: bold"
+            >
+              自托管 runner 使用指南
+            </h1>
+          </div>
+          <p style="font-size: 0.85rem; line-height: 1.6; font-family: sans-serif">
+            这是文章的正文部分。
+          </p>
+          <div
+            style="
+              border: 1px dashed #ccc;
+              padding: 1rem;
+              text-align: center;
+              font-size: 0.75rem;
+              background: #fff;
+              color: var(--text-secondary);
+            "
+          >
+            【占位图片预览：我的示意图】
+          </div>
+          <p style="font-size: 0.85rem; line-height: 1.6; font-family: sans-serif">
+            我们可以在这里直接进行排版修改与编辑...
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>2. 本地命令行 `Justfile` 核心任务链</h3>
+  <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-secondary)">
+    我们将使用 Rust 社区流行的任务运行工具 `just` 来提供高内聚的工作流指令，摆脱零散脚本：
+  </p>
+
+  <div class="options">
+    <div class="option" data-choice="edit" onclick="toggleSelect(this)">
+      <div class="letter">1</div>
+      <div class="content">
+        <h3>just edit</h3>
+        <p>
+          启动本地博客开发模式。并联运行 Zola 热重载预览服务器（端口 8085）和轻量级本地 Node.js API
+          读写服务，并在浏览器自动打开编辑入口。
+        </p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="status" onclick="toggleSelect(this)">
+      <div class="letter">2</div>
+      <div class="content">
+        <h3>just status</h3>
+        <p>
+          检查本地待发布文件的状态。例如：自动扫描新文章中引用的本地图片，检查它们是否还未转换成
+          WebP 格式。
+        </p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="deploy" onclick="toggleSelect(this)">
+      <div class="letter">3</div>
+      <div class="content">
+        <h3>just deploy</h3>
+        <p>
+          一键安全编译和发布：首先运行代码风格检查，检测并转换文章中的新图片为 WebP，上传图片至
+          R2，重新渲染替换图片链接为 CDN URL，最后生成 Zola 静态站点并部署至 Cloudflare Pages。
+        </p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="push" onclick="toggleSelect(this)">
+      <div class="letter">4</div>
+      <div class="content">
+        <h3>just push</h3>
+        <p>
+          本地静态部署成果满意后，一键自动同步 Git 源码。依次执行 `git add`, `git commit` 以及 `git
+          push` 把源码同步至 GitHub 仓库进行备份。
+        </p>
+      </div>
+    </div>
+  </div>
+</div>

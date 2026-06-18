@@ -1,0 +1,8 @@
+{
+  "apiPort": 8086,
+  "zolaPort": 8085,
+  "postsDir": "content/posts",
+  "staticDir": "static",
+  "imagesDir": "static/tmp/raw/images",
+  "webPathPrefix": "/tmp/raw/images"
+}

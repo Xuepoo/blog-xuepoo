@@ -1,0 +1,272 @@
+<h2>Typora-style 博客网页编辑器重构方案</h2>
+<p class="subtitle">沉浸式 Markdown 编辑器设计，支持粘贴图片、隐藏侧栏与多视角切换</p>
+
+<div class="section">
+  <h3>1. 重构后的编辑器界面原型</h3>
+  <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-secondary)">
+    去掉分散的表单框，使配置直接作为 Markdown 的 Frontmatter
+    进行一体化编辑。点击左上角按钮可以自由收起/展开侧边栏。
+  </p>
+
+  <div class="mockup">
+    <!-- Header Toolbar -->
+    <div
+      class="mockup-header"
+      style="
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #ebdcb9;
+        border-bottom: 1px solid #4a3e3d;
+        padding: 0.5rem 1rem;
+      "
+    >
+      <div style="display: flex; align-items: center; gap: 0.75rem">
+        <!-- Sidebar Toggle -->
+        <button
+          class="mock-button"
+          style="
+            background: #fff;
+            color: #333;
+            border: 1.5px solid #333;
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+          "
+        >
+          <span>📂</span> <span>收起侧栏</span>
+        </button>
+        <strong style="color: #4a3e3d; font-size: 0.85rem">📝 github-actions-runner.md</strong>
+      </div>
+
+      <!-- View mode tabs -->
+      <div
+        style="
+          display: flex;
+          background: #fff;
+          border: 1.5px solid #333;
+          border-radius: 4px;
+          overflow: hidden;
+          font-size: 0.75rem;
+        "
+      >
+        <div
+          style="
+            padding: 0.25rem 0.75rem;
+            background: #333;
+            color: #fff;
+            cursor: pointer;
+            font-weight: bold;
+          "
+        >
+          源码编辑 (Raw)
+        </div>
+        <div
+          style="
+            padding: 0.25rem 0.75rem;
+            background: #fff;
+            color: #333;
+            cursor: pointer;
+            border-left: 1px solid #333;
+          "
+        >
+          双栏预览 (Split)
+        </div>
+        <div
+          style="
+            padding: 0.25rem 0.75rem;
+            background: #fff;
+            color: #333;
+            cursor: pointer;
+            border-left: 1px solid #333;
+          "
+        >
+          纯净预览 (Preview)
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div style="display: flex; gap: 0.5rem">
+        <button
+          class="mock-button"
+          style="background: var(--success); font-size: 0.75rem; padding: 0.25rem 0.75rem"
+        >
+          💾 保存文章
+        </button>
+        <button
+          class="mock-button"
+          style="background: var(--error); font-size: 0.75rem; padding: 0.25rem 0.75rem"
+        >
+          🗑️ 删除文章
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="mockup-body" style="padding: 0; background: #fcfaf2">
+      <div style="display: flex; min-height: 450px">
+        <!-- Collapsible Sidebar -->
+        <div
+          id="mock-sidebar-el"
+          style="
+            width: 200px;
+            background: #fff;
+            border-right: 1px solid var(--border);
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+          "
+        >
+          <h4 class="label" style="margin-bottom: 0.25rem; font-size: 0.65rem">所有文章</h4>
+          <div
+            style="
+              background: #e8f4fd;
+              border: 1px solid #0071e3;
+              border-radius: 4px;
+              padding: 0.4rem;
+              font-size: 0.75rem;
+              cursor: pointer;
+            "
+          >
+            <strong>github-actions-runner.md</strong>
+            <div style="font-size: 0.65rem; color: var(--text-secondary)">2026-06-18</div>
+          </div>
+          <div
+            style="
+              background: #fff;
+              border: 1px solid var(--border);
+              border-radius: 4px;
+              padding: 0.4rem;
+              font-size: 0.75rem;
+              color: var(--text-secondary);
+              cursor: pointer;
+            "
+          >
+            hello-world.md
+            <div style="font-size: 0.65rem; color: var(--text-secondary)">2026-05-28</div>
+          </div>
+          <button
+            class="mock-button"
+            style="
+              background: #fff;
+              color: #333;
+              border: 1px solid #333;
+              width: 100%;
+              font-size: 0.7rem;
+              padding: 0.3rem;
+              margin-top: auto;
+            "
+          >
+            + 新建文章
+          </button>
+        </div>
+
+        <!-- Editor Pane (Typora-like) -->
+        <div
+          style="
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            gap: 0.5rem;
+            background: #fcfaf2;
+          "
+        >
+          <div
+            style="
+              font-size: 0.7rem;
+              color: var(--text-secondary);
+              margin-bottom: 0.25rem;
+              display: flex;
+              justify-content: space-between;
+            "
+          >
+            <span>💡 支持直接复制图片并在此区域 <b>Ctrl+V</b> 粘贴上传</span>
+            <span style="color: var(--accent)">纯文本编辑模式</span>
+          </div>
+
+          <!-- Unified textarea -->
+          <textarea
+            class="mock-input"
+            style="
+              flex: 1;
+              font-family: monospace;
+              font-size: 0.85rem;
+              background: #fcfaf2;
+              border: none;
+              outline: none;
+              resize: none;
+              line-height: 1.5;
+              padding: 0.5rem;
+              color: #2c2c2a;
+            "
+            readonly
+          >
++++
+title = "GitHub Actions 使用自托管的 Runner"
+description = "本文介绍如何配置自托管的 GitHub Actions Runner 并用它构建 Private 仓库。"
+date = 2026-06-18
+[taxonomies]
+tags = ["CI-CD", "Linux", "GitHub"]
++++
+
+## 1. 介绍
+
+在遇到私有仓库构建时间额度超限时，自托管的 Runner 是一个绝佳的本地优化解。
+
+### 图片粘贴测试
+直接在下方按 Ctrl+V 粘贴图片，编辑器会自动转换为 Markdown 语法：
+![Pasted Image](/tmp/raw/images/pasted-178177029.png)
+
+## 2. 安装步骤
+1. 下载安装包...
+</textarea
+          >
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>2. 核心技术升级点</h3>
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>✨ 新增特性</h4>
+      <ul>
+        <li>
+          <b>Frontmatter 一体化编辑</b>：去除顶部输入表单，完全还原本地编写 Markdown
+          文章的纯粹体验。
+        </li>
+        <li>
+          <b>Ctrl+V 剪贴板图片直传</b>：监听 `paste` 事件拦截图片文件，自动发起 `POST /api/images`
+          接口转换上传，并在光标处自动插入标准的 Markdown 图像引用。
+        </li>
+        <li>
+          <b>侧边栏折叠与三种视口切换</b
+          >：使用本地状态自由开合侧栏；支持“纯源码”、“左右双栏同步对比”、“纯预览”三种模式。
+        </li>
+        <li>
+          <b>物理文章删除</b>：左上角加入“删除文章”功能，支持弹窗二次确认后通过 `DELETE
+          /api/posts/:filename` 将本地文章在磁盘上安全抹除。
+        </li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>⚠️ 注意事项</h4>
+      <ul>
+        <li>
+          <b>Zola 前置元数据语法</b>：文章头部必须正确编写 `+++` 前缀和后缀，如果 TOML
+          语法错误，Zola 将无法正常解析编译。
+        </li>
+        <li>
+          <b>删除文件不可恢复</b>：磁盘文件删除后将直接移除（非移入垃圾箱），必须通过 Git
+          撤销修改来进行版本找回。
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
