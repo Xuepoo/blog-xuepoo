@@ -1,9 +1,11 @@
 {% extends "base.html" %} {% block content %}
 <div class="zen-post-list">
   <div class="zen-sort-bar">
-    <span class="zen-sort-label">排序：</span>
-    <button id="sort-by-date" class="zen-sort-btn active">最新发布</button>
-    <button id="sort-by-views" class="zen-sort-btn">最多阅读</button>
+    <label for="sort-select" class="zen-sort-label">排序：</label>
+    <select id="sort-select" class="zen-sort-select">
+      <option value="date">最新发布</option>
+      <option value="views">最多阅读</option>
+    </select>
   </div>
 
   {% if paginator %} {% set pages = paginator.pages %} {% else %} {% set pages = section.pages %} {%
@@ -53,8 +55,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     const postList = document.querySelector(".zen-post-list");
     const postItems = Array.from(document.querySelectorAll(".zen-post-item"));
-    const sortDateBtn = document.getElementById("sort-by-date");
-    const sortViewsBtn = document.getElementById("sort-by-views");
+    const sortSelect = document.getElementById("sort-select");
 
     if (!postList || postItems.length === 0) return;
 
@@ -119,17 +120,9 @@
       });
     }
 
-    if (sortDateBtn && sortViewsBtn) {
-      sortDateBtn.addEventListener("click", () => {
-        sortDateBtn.classList.add("active");
-        sortViewsBtn.classList.remove("active");
-        sortPosts("date");
-      });
-
-      sortViewsBtn.addEventListener("click", () => {
-        sortViewsBtn.classList.add("active");
-        sortDateBtn.classList.remove("active");
-        sortPosts("views");
+    if (sortSelect) {
+      sortSelect.addEventListener("change", (e) => {
+        sortPosts(e.target.value);
       });
     }
   });
