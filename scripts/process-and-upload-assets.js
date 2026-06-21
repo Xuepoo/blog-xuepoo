@@ -29,16 +29,13 @@ files.forEach((file) => {
     let hasFailed = false;
 
     matches.forEach(({ fullMatch, prefix, imgName }) => {
+      const decodedImgName = decodeURIComponent(imgName);
       // Determine local path based on matched prefix
       let imgLocalPath;
       if (prefix.includes("assets")) {
-        imgLocalPath = path.join(__dirname, "../static/assets", decodeURIComponent(imgName));
+        imgLocalPath = path.join(__dirname, "../static/assets", decodedImgName);
       } else {
-        imgLocalPath = path.join(
-          __dirname,
-          "../static/tmp/raw/images",
-          decodeURIComponent(imgName),
-        );
+        imgLocalPath = path.join(__dirname, "../static/tmp/raw/images", decodedImgName);
       }
 
       if (!fs.existsSync(imgLocalPath)) {
@@ -49,18 +46,18 @@ files.forEach((file) => {
       // We create a single-item temp directory for sync-assets.sh to upload
       const tempDir = path.join(__dirname, `../tmp/raw-batch-${Date.now()}`);
       fs.mkdirSync(tempDir, { recursive: true });
-      fs.copyFileSync(imgLocalPath, path.join(tempDir, imgName));
+      fs.copyFileSync(imgLocalPath, path.join(tempDir, decodedImgName));
 
       const r2Prefix = `blog/posts/${postSlug}`;
-      console.log(`Running sync-assets.sh for ${imgName} to prefix ${r2Prefix}...`);
+      console.log(`Running sync-assets.sh for ${decodedImgName} to prefix ${r2Prefix}...`);
 
       try {
         const cmd = `${SYNC_SCRIPT} "${tempDir}" "${r2Prefix}" 85 cdn-xuepoo-xyz`;
         execSync(cmd, { stdio: "inherit" });
 
         // Rewrite Markdown link in content
-        const baseNameWithoutExt = path.parse(imgName).name;
-        const newUrl = `https://cdn.xuepoo.xyz/${r2Prefix}/${baseNameWithoutExt}.webp`;
+        const baseNameWithoutExt = path.parse(decodedImgName).name;
+        const newUrl = encodeURI(`https://cdn.xuepoo.xyz/${r2Prefix}/${baseNameWithoutExt}.webp`);
         const oldRef = fullMatch;
 
         updatedContent = updatedContent.split(oldRef).join(newUrl);

@@ -22,7 +22,7 @@ deploy: test
     @echo "=== Building Zola site ==="
     @zola build
     @echo "=== Deploying to Cloudflare Pages ==="
-    @wrangler pages deploy public --project-name xuepoo-blog --branch main
+    @./scripts/deploy-pages.sh public xuepoo-blog main
 
 commit message="":
     @if [ -z "{{message}}" ]; then \

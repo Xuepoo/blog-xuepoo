@@ -8,7 +8,8 @@
         <time datetime="{{ page.date | date(format='%Y-%m-%d') }}"
           >{{ page.date | date(format="%Y-%m-%d") }}</time
         >
-        &middot; 字数: {{ page.word_count }} 字 {% if page.extra.tags %} &middot; 标签: {% for tag
+        &middot; 字数: {{ page.word_count }} 字 &middot; 阅读:
+        <span id="zen-view-count">...</span> 次 {% if page.extra.tags %} &middot; 标签: {% for tag
         in page.extra.tags %}
         <span class="zen-tag" style="margin-right: 4px">#{{ tag }}</span>
         {% endfor %} {% endif %}
@@ -39,8 +40,7 @@
     {% endif %}
 
     <div class="zen-article-body">
-      {{ page.content | replace(from='src="static/assets/', to='src="/assets/') |
-      replace(from='href="static/assets/', to='href="/assets/') | safe }}
+      {{ page.content | replace(from=page.permalink ~ 'static/assets/', to='/assets/') | safe }}
     </div>
 
     {% if page.later or page.earlier %}
@@ -128,4 +128,39 @@
     }
   });
 </script>
-{% endif %} {% endblock content %}
+{% endif %}
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const slug = "{{ page.slug | safe }}";
+    const viewSpan = document.getElementById("zen-view-count");
+    if (!slug || !viewSpan) return;
+
+    let viewed = [];
+    try {
+      viewed = JSON.parse(localStorage.getItem("viewed_posts") || "[]");
+    } catch (e) {}
+
+    const hasViewed = viewed.includes(slug);
+    const method = hasViewed ? "GET" : "POST";
+    const url = `/api/views?slug=${encodeURIComponent(slug)}`;
+
+    fetch(url, { method: method })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && typeof data.views === "number") {
+          viewSpan.textContent = data.views;
+          if (!hasViewed && data.skip !== "cooldown" && data.skip !== "bot") {
+            viewed.push(slug);
+            localStorage.setItem("viewed_posts", JSON.stringify(viewed));
+          }
+        } else {
+          viewSpan.textContent = "-";
+        }
+      })
+      .catch(() => {
+        viewSpan.textContent = "-";
+      });
+  });
+</script>
+{% endblock content %}

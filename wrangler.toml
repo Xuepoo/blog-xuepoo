@@ -1,0 +1,7 @@
+name = "xuepoo-blog"
+pages_build_output_dir = "public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "xuepoo-blog-db"
+database_id = "ae492ba9-0f28-4d62-bf3c-49f90482c9e7"
