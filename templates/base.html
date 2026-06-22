@@ -108,7 +108,8 @@
           url: {{ page.permalink | json_encode | safe }},
           date: {{ page.date | date(format='%Y-%m-%d') | json_encode | safe }},
           description: {{ page.description | json_encode | safe }},
-          content: {{ page.content | striptags | json_encode | safe }}
+          content: {{ page.content | striptags | json_encode | safe }},
+          tags: {{ page.taxonomies.tags | default(value=[]) | json_encode | safe }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
       ];
@@ -126,11 +127,21 @@
             return;
           }
 
-          const matches = window.searchDatabase.filter(post =>
-            post.title.toLowerCase().includes(query) ||
-            post.description.toLowerCase().includes(query) ||
-            post.content.toLowerCase().includes(query)
-          );
+          const matches = window.searchDatabase.filter(post => {
+            const isTagSearch = query.startsWith("#");
+            if (isTagSearch) {
+              // 专门按标签搜索 (例如 "#linux")
+              const tagQuery = query.slice(1);
+              return post.tags && post.tags.some(tag => tag.toLowerCase().includes(tagQuery));
+            } else {
+              // 全局搜索：匹配标题、描述、内容或标签
+              const inTags = post.tags && post.tags.some(tag => tag.toLowerCase().includes(query));
+              return inTags ||
+                     post.title.toLowerCase().includes(query) ||
+                     post.description.toLowerCase().includes(query) ||
+                     post.content.toLowerCase().includes(query);
+            }
+          });
 
           if (matches.length === 0) {
             searchResults.innerHTML = '<div class="zen-search-no-results">未找到匹配文章</div>';
