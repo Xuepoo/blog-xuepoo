@@ -9,6 +9,8 @@ node_modules/
 .env
 .env.*
 .wrangler/
+.superpowers/
+.hermes/
 static/tmp/
 .obsidian/
 static/assets/
