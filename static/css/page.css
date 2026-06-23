@@ -402,6 +402,19 @@ a:hover {
   font-family: "Noto Sans SC", sans-serif;
 }
 
+/* Make links inside the article body stand out */
+.zen-article-body a {
+  color: var(--accent-color);
+  border-bottom: 1px dashed var(--accent-color);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.zen-article-body a:hover {
+  color: var(--text-color);
+  border-bottom: 1px solid var(--text-color);
+}
+
 .zen-article-body h2 {
   font-size: 1.5rem;
   border-bottom: 1px dashed var(--border-color);
