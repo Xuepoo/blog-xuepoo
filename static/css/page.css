@@ -21,6 +21,22 @@ body {
   min-height: 100vh;
 }
 
+html,
+body {
+  overflow: hidden;
+  height: 100%;
+}
+
+#vecto-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  z-index: 1;
+}
+
 ::selection {
   background: var(--text-color);
   color: var(--bg-color);

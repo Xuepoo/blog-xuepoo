@@ -1,0 +1,19 @@
+{
+  "name": "xuepoo-blog",
+  "private": true,
+  "scripts": {
+    "build": "bun build src/index.ts --outfile static/js/blog-renderer.js --minify",
+    "dev": "bun build src/index.ts --outfile static/js/blog-renderer.js --watch --minify",
+    "obfuscate": "bun scripts/obfuscate.ts"
+  },
+  "dependencies": {
+    "@vecto-ui/core": "^0.9.0",
+    "@vecto-ui/ui": "^0.4.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

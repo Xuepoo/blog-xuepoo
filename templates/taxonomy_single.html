@@ -1,48 +1,8 @@
-{% extends "base.html" %} {% block title %}标签: {{ term.name }} - {{ config.title }}{% endblock
-title %} {% block content %}
-<section style="margin: 3rem 0">
-  <h1 style="margin-bottom: 2rem">关于 &ldquo;{{ term.name }}&rdquo; 的所有文章</h1>
-
-  <ul class="post-list" style="margin-top: 2rem">
-    {% for page in term.pages %}
-    <li class="post-item">
-      <h2><a href="{{ page.permalink | safe }}">{{ page.title }}</a></h2>
-      <div class="post-meta">
-        <time datetime="{{ page.date | date(format='%Y-%m-%d') }}"
-          >{{ page.date | date(format='%Y 年 %m 月 %d 日') }}</time
-        >
-        {% if page.reading_time %}
-        <span>&middot;</span>
-        <span>阅读时间约 {{ page.reading_time }} 分钟</span>
-        {% endif %}
-      </div>
-      {% if page.summary %}
-      <p class="post-summary">{{ page.summary | safe }}</p>
-      {% elif page.description %}
-      <p class="post-summary">{{ page.description }}</p>
-      {% endif %}
-    </li>
-    {% else %}
-    <li class="post-item">
-      <p style="text-align: center; color: var(--text-secondary); margin: 4rem 0">暂无相关文章。</p>
-    </li>
-    {% endfor %}
-  </ul>
-
-  <div
-    style="
-      margin-top: 5rem;
-      padding-top: 2rem;
-      border-top: 1px solid var(--border-color);
-      text-align: center;
-    "
-  >
-    <a
-      href="{{ get_url(path='@/_index.md') }}"
-      style="font-family: var(--font-sans); font-weight: 700; text-decoration: none"
-    >
-      &larr; 返回主页文章列表
-    </a>
-  </div>
-</section>
-{% endblock content %}
+{% extends "base.html" %} {% block page_data %} { "type": "taxonomy_single", "term": {{ term.name |
+json_encode | safe }}, "posts": [ {% for page in term.pages %} { "title": {{ page.title |
+json_encode | safe }}, "url": {{ page.permalink | json_encode | safe }}, "date": {{ page.date |
+date(format='%Y-%m-%d') | json_encode | safe }}, "slug": {{ page.slug | safe | json_encode | safe
+}}, "description": {{ page.description | default(value="") | json_encode | safe }}, "summary": {{
+page.summary | default(value="") | json_encode | safe }}, "tags": {{ page.extra.tags |
+default(value=[]) | json_encode | safe }} }{% if not loop.last %},{% endif %} {% endfor %} ] } {%
+endblock %}

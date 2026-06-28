@@ -19,8 +19,12 @@ test:
 deploy: test
     @echo "=== Processing assets and uploading to R2 ==="
     @node scripts/process-and-upload-assets.js
+    @echo "=== Building JS bundle ==="
+    @bun run build
     @echo "=== Building Zola site ==="
     @zola build
+    @echo "=== Obfuscating HTML data ==="
+    @bun run obfuscate
     @echo "=== Deploying to Cloudflare Pages ==="
     @./scripts/deploy-pages.sh public xuepoo-blog main
 
