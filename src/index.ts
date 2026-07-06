@@ -566,7 +566,6 @@ function renderApp() {
     (window as any).mainScroll = mainScroll;
   }
 
-
   let currentY = 20;
 
   // ── Header ──────────────────────────────────────────────────────────────────
@@ -881,6 +880,12 @@ function renderApp() {
     document.body.style.height = `${footerY + 80}px`;
     mainScroll.height = footerY + 80;
   }
+
+  currentScene.markDirty();
+  // Force a synchronous render immediately to prevent canvas flickering during window resize.
+  // This ensures the canvas pixel buffer is refilled in the same event loop task after
+  // Scene.ts clears it via canvas.width = newWidth.
+  currentScene.render(true);
 }
 
 // ─── View Tracking ────────────────────────────────────────────────────────────
