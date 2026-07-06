@@ -640,7 +640,9 @@ function renderApp() {
 
     detailY += pageMeta.height + 40;
 
-    const rawMarkdown = payload.raw_content || "";
+    let rawMarkdown = payload.raw_content || "";
+    // Strip Zola TOML frontmatter
+    rawMarkdown = rawMarkdown.replace(/^\+\+\+[\s\S]*?\+\+\+\n*/, "");
     const md = new CustomMarkdown(rawMarkdown, {
       maxWidth: contentWidth,
       theme: {
