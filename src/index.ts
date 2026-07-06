@@ -1,5 +1,5 @@
 import { Scene, Entity } from "@vectojs/core";
-import { ScrollView, Text, RichText, Input, Card } from "@vectojs/ui";
+import { ScrollView, Text, RichText, Input, Card, Markdown } from "@vectojs/ui";
 
 const key = 42;
 
@@ -38,313 +38,7 @@ const imageCache = new Map<string, { img: HTMLImageElement; aspectRatio: number 
 let _canvasWheelHandler: ((e: WheelEvent) => void) | null = null;
 let currentMainScroll: Container | null = null;
 
-// HTML tags to RichText spans
-function parseHtmlToSpans(html: string): any[] {
-  const spans: any[] = [];
-  const tempDiv = document.createElement("div");
-  tempDiv.innerHTML = html;
-
-  function traverse(node: Node, style: any = {}) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent || "";
-      if (text) {
-        spans.push({ text, style: { ...style } });
-      }
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const el = node as HTMLElement;
-      const nextStyle = { ...style };
-
-      if (el.tagName === "STRONG" || el.tagName === "B") {
-        nextStyle.bold = true;
-      } else if (el.tagName === "EM" || el.tagName === "I") {
-        nextStyle.italic = true;
-      } else if (el.tagName === "A") {
-        nextStyle.href = el.getAttribute("href") || "";
-      } else if (el.tagName === "CODE") {
-        nextStyle.color = "#8c765c";
-        nextStyle.bold = true;
-      }
-
-      for (let i = 0; i < el.childNodes.length; i++) {
-        traverse(el.childNodes[i], nextStyle);
-      }
-    }
-  }
-
-  traverse(tempDiv);
-  return spans;
-}
-
-interface ContentBlock {
-  type: "h1" | "h2" | "h3" | "p" | "pre" | "blockquote" | "ul" | "ol";
-  spans?: any[];
-  text?: string;
-  codeLang?: string;
-  items?: any[][];
-}
-
-function parseHtmlToBlocks(html: string): ContentBlock[] {
-  const blocks: ContentBlock[] = [];
-  const div = document.createElement("div");
-  div.innerHTML = html;
-
-  for (let i = 0; i < div.childNodes.length; i++) {
-    const node = div.childNodes[i];
-    if (node.nodeType !== Node.ELEMENT_NODE) continue;
-    const el = node as HTMLElement;
-
-    if (
-      el.tagName === "H1" ||
-      el.tagName === "H2" ||
-      el.tagName === "H3" ||
-      el.tagName === "H4" ||
-      el.tagName === "H5" ||
-      el.tagName === "H6"
-    ) {
-      const spans = parseHtmlToSpans(el.innerHTML);
-      for (const span of spans) {
-        span.style = { ...span.style, bold: true };
-      }
-      blocks.push({
-        type: el.tagName.toLowerCase() as any,
-        spans,
-      });
-    } else if (el.tagName === "IMG") {
-      blocks.push({
-        type: "p",
-        text: el.getAttribute("src") || "",
-        codeLang: "image",
-        spans: [{ text: el.getAttribute("alt") || "" }],
-      });
-    } else if (el.tagName === "P") {
-      const imgEl = el.querySelector("img");
-      const hasMath = el.querySelector(".katex") !== null;
-      if (imgEl) {
-        blocks.push({
-          type: "p",
-          text: imgEl.getAttribute("src") || "",
-          codeLang: "image",
-          spans: [{ text: imgEl.getAttribute("alt") || "" }],
-        });
-      } else if (hasMath) {
-        blocks.push({
-          type: "blockquote",
-          text: el.outerHTML,
-          codeLang: "math",
-        });
-      } else {
-        blocks.push({
-          type: "p",
-          spans: parseHtmlToSpans(el.innerHTML),
-        });
-      }
-    } else if (el.classList.contains("katex-display") || el.querySelector(".katex-display") !== null) {
-      blocks.push({
-        type: "blockquote",
-        text: el.innerHTML,
-        codeLang: "math",
-      });
-    } else if (el.tagName === "PRE") {
-      const codeEl = el.querySelector("code");
-      const text = codeEl ? codeEl.textContent || "" : el.textContent || "";
-      const codeLang = codeEl ? codeEl.className.replace("language-", "") : "";
-      blocks.push({
-        type: "pre",
-        text: text.trim(),
-        codeLang,
-      });
-    } else if (el.tagName === "BLOCKQUOTE") {
-      blocks.push({
-        type: "blockquote",
-        spans: parseHtmlToSpans(el.innerHTML),
-      });
-    } else if (el.tagName === "UL" || el.tagName === "OL") {
-      const items = Array.from(el.querySelectorAll("li")).map(li => parseHtmlToSpans(li.innerHTML));
-      blocks.push({
-        type: el.tagName.toLowerCase() as any,
-        items,
-      } as any);
-    }
-  }
-
-  return blocks;
-}
-
-// ─── Custom Entity Components ─────────────────────────────────────────────────
-
-class QuoteBlock extends Entity {
-  constructor(spans: any[], width: number) {
-    super();
-    const rt = new RichText(spans, {
-      font: "italic 16px Noto Serif SC, serif",
-      color: "#7a7265",
-      maxWidth: width - 24,
-    });
-    rt.setPosition(20, 0);
-    this.add(rt);
-
-    this.width = width;
-    this.height = rt.height;
-  }
-
-  public render(r: any): void {
-    r.save();
-    r.beginPath();
-    r.roundRect(0, 0, 4, this.height, 0);
-    r.fill("#8c765c");
-    r.restore();
-  }
-}
-
-class MathBlock extends Entity {
-  private img: HTMLImageElement | null = null;
-  private loaded = false;
-
-  constructor(htmlContent: string, width: number) {
-    super();
-    this.width = width;
-    this.height = 60;
-
-    const container = document.createElement("div");
-    container.style.position = "absolute";
-    container.style.visibility = "hidden";
-    container.style.color = "#332f29";
-    container.style.fontFamily = "Noto Serif SC, serif";
-    container.style.width = `${width}px`;
-    container.innerHTML = htmlContent;
-    document.body.appendChild(container);
-
-    const w = container.offsetWidth || width;
-    const h = container.offsetHeight || 40;
-    this.height = h + 20;
-
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-        <foreignObject width="100%" height="100%">
-          <div xmlns="http://www.w3.org/1999/xhtml" style="color: #332f29; font-family: 'Noto Serif SC', serif; line-height: 1.85;">
-            ${htmlContent}
-          </div>
-        </foreignObject>
-      </svg>
-    `;
-
-    document.body.removeChild(container);
-
-    const img = new Image();
-    img.onload = () => {
-      this.img = img;
-      this.loaded = true;
-      this.width = w;
-      this.height = h + 20;
-    };
-    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.trim());
-  }
-
-  public render(r: any): void {
-    if (this.loaded && this.img) {
-      r.drawImage(this.img, Math.max(0, (this.width - this.img.width) / 2), 10);
-    }
-  }
-}
-
-class BlogImage extends Entity {
-  private img: HTMLImageElement | null = null;
-  private loaded = false;
-  private src: string;
-  private alt: string;
-  private maxWidth: number;
-
-  constructor(src: string, alt: string, maxWidth: number) {
-    super();
-    this.src = src;
-    this.alt = alt;
-    this.maxWidth = maxWidth;
-    this.width = maxWidth;
-
-    const cached = imageCache.get(src);
-    if (cached) {
-      this.loaded = true;
-      this.img = cached.img;
-      this.height = Math.round(this.maxWidth * cached.aspectRatio);
-    } else {
-      this.height = 300;
-      if (typeof window !== "undefined") {
-        const img = new window.Image();
-        img.onload = () => {
-          this.loaded = true;
-          this.img = img;
-          const w = img.naturalWidth || 1;
-          const h = img.naturalHeight || 1;
-          const aspectRatio = h / w;
-          this.height = Math.round(this.maxWidth * aspectRatio);
-          imageCache.set(src, { img, aspectRatio });
-          renderPage();
-        };
-        img.onerror = () => {
-          this.loaded = false;
-          const aspectRatio = 150 / this.maxWidth;
-          this.height = 150;
-          imageCache.set(src, { img, aspectRatio });
-          renderPage();
-        };
-        img.src = src;
-      }
-    }
-  }
-
-  public render(r: any): void {
-    if (this.loaded && this.img) {
-      r.drawImage(this.img, 0, 0, this.width, this.height);
-    } else {
-      r.save();
-      r.beginPath();
-      r.roundRect(0, 0, this.width, this.height, 6);
-      r.fill("#ede4d3");
-      r.restore();
-    }
-  }
-}
-
-class CodeBlock extends Entity {
-  constructor(text: string, width: number) {
-    super();
-    let wrappedText = "";
-    if (width > 0) {
-      const charsPerLine = Math.floor((width - 32) / 8.4);
-      for (const line of text.split("\n")) {
-        let currentLine = line;
-        while (currentLine.length > charsPerLine) {
-          wrappedText += currentLine.substring(0, charsPerLine) + "\n";
-          currentLine = currentLine.substring(charsPerLine);
-        }
-        wrappedText += currentLine + "\n";
-      }
-      if (wrappedText.endsWith("\n")) wrappedText = wrappedText.slice(0, -1);
-    } else {
-      wrappedText = text;
-    }
-
-    const t = new Text(wrappedText, {
-      font: "14px monospace",
-      color: "#332f29",
-      preserveLeadingSpaces: true,
-      lineHeight: 22,
-    });
-    t.setPosition(16, 16);
-    this.add(t);
-
-    this.width = width;
-    this.height = t.height + 32;
-  }
-
-  public render(r: any): void {
-    r.save();
-    r.beginPath();
-    r.roundRect(0, 0, this.width, this.height, 4);
-    r.fill("#ede4d3");
-    r.restore();
-  }
-}
+// HTML tag parser removed. Using native VectoJS Markdown component.
 
 class DividerLine extends Entity {
   private color: string;
@@ -721,14 +415,20 @@ function renderApp() {
 
       itemY += 24;
 
-      const summaryText = new RichText(
-        parseHtmlToSpans(post.summary || post.description || ""),
-        {
-          font: "15px Noto Serif SC, serif",
-          color: "#7a7265",
-          maxWidth: contentWidth,
+      const summaryText = new Markdown(post.summary || post.description || "", {
+        maxWidth: contentWidth,
+        theme: {
+          bodyFont: "15px Noto Serif SC, serif",
+          textColor: "#7a7265",
+          headingColor: "#332f29",
+          codeColor: "#8c765c",
+          codeBgColor: "#ede4d3",
+          quoteBorderColor: "#8c765c",
+          quoteTextColor: "#7a7265",
+          hrColor: "#e8dfd0",
+          fontSize: 15,
         }
-      );
+      });
       summaryText.setPosition(0, itemY);
       postItem.add(summaryText);
 
@@ -786,40 +486,25 @@ function renderApp() {
 
     detailY += pageMeta.height + 40;
 
-    const contentBlocks = parseHtmlToBlocks(payload.content);
-    for (const block of contentBlocks) {
-      let blockEntity: Entity;
-
-      if (block.codeLang === "image") {
-        blockEntity = new BlogImage(block.text || "", block.spans?.[0]?.text || "", contentWidth);
-      } else if (block.codeLang === "math") {
-        blockEntity = new MathBlock(block.text || "", contentWidth);
-      } else if (
-        block.type === "h1" || block.type === "h2" || block.type === "h3" ||
-        block.type === "h4" || block.type === "h5" || block.type === "h6"
-      ) {
-        const fs = block.type === "h1" ? 32 : block.type === "h2" ? 26 : block.type === "h3" ? 21 : 18;
-        blockEntity = new RichText(block.spans || [], {
-          font: `600 ${fs}px Noto Serif SC, serif`,
-          color: "#332f29",
-          maxWidth: contentWidth,
-        });
-      } else if (block.type === "pre") {
-        blockEntity = new CodeBlock(block.text || "", contentWidth);
-      } else if (block.type === "blockquote") {
-        blockEntity = new QuoteBlock(block.spans || [], contentWidth);
-      } else {
-        blockEntity = new RichText(block.spans || [], {
-          font: "16px Noto Serif SC, serif",
-          color: "#332f29",
-          maxWidth: contentWidth,
-        });
+    const rawMarkdown = payload.raw_content || "";
+    const md = new Markdown(rawMarkdown, {
+      maxWidth: contentWidth,
+      theme: {
+        bodyFont: "16px Noto Serif SC, serif",
+        codeFont: "14px monospace",
+        textColor: "#332f29",
+        headingColor: "#332f29",
+        codeColor: "#8c765c",
+        codeBgColor: "#ede4d3",
+        quoteBorderColor: "#8c765c",
+        quoteTextColor: "#7a7265",
+        hrColor: "#e8dfd0",
+        fontSize: 16,
       }
-
-      blockEntity.setPosition(0, detailY);
-      page.add(blockEntity);
-      detailY += blockEntity.height + 24;
-    }
+    });
+    md.setPosition(0, detailY);
+    page.add(md);
+    detailY += md.height + 24;
 
     // Prev/Next Navigation
     const navEntity = new Container();
