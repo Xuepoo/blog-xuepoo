@@ -528,8 +528,9 @@ function renderApp() {
   const mainScroll = new Container();
   currentMainScroll = mainScroll;
 
-  // Enable buttery smooth scrolling interpolation for mouse wheels
-  mainScroll.setTransition({ y: "spring" });
+  // Use a fast tween instead of a spring to prevent elastic bouncing / overshoot,
+  // while still smoothing out rigid mouse wheel steps.
+  mainScroll.setTransition({ y: { type: "tween", duration: 120, easing: "easeOutCubic" } });
 
   // Keep the VectoJS render loop alive while the scrolling spring settles
   const _origUpdate = mainScroll.update.bind(mainScroll);
