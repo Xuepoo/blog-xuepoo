@@ -651,13 +651,17 @@ function renderApp() {
     // ── Post Detail ──────────────────────────────────────────────────────────
     let detailY = 0;
 
-    const pageTitle = new RichText(payload.title || "Untitled", {
-      fontSize: isMobile ? 32 : 44,
-      lineHeight: 1.4,
-      fontFamily: "STKaiti, KaiTi, serif",
-      color: "#332f29",
-      maxWidth: contentWidth,
-    });
+    const pageTitle = new RichText(
+      [{
+        text: payload.title || "Untitled",
+        style: { fontSize: isMobile ? 32 : 44, lineHeight: 1.4, bold: true }
+      }],
+      {
+        font: `${isMobile ? 32 : 44}px STKaiti, KaiTi, serif`,
+        color: "#332f29",
+        maxWidth: contentWidth,
+      }
+    );
     pageTitle.setPosition(0, detailY);
     page.add(pageTitle);
 
