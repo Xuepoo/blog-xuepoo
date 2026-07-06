@@ -71,23 +71,6 @@
       }
     </script>
 
-    <script id="search-data" type="text/plain">
-      [
-        {% set posts_section = get_section(path="posts/_index.md") %}
-        {% for page in posts_section.pages %}
-        {
-          "title": {{ page.title | json_encode | safe }},
-          "url": {{ page.permalink | json_encode | safe }},
-          "date": {{ page.date | date(format='%Y-%m-%d') | json_encode | safe }},
-          "description": {{ page.description | json_encode | safe }},
-          "content": {{ page.content | striptags | json_encode | safe }},
-          "tags": {{ page.taxonomies.tags | default(value=[]) | json_encode | safe }},
-          "slug": {{ page.slug | safe | json_encode | safe }}
-        }{% if not loop.last %},{% endif %}
-        {% endfor %}
-      ]
-    </script>
-
     <script src="/js/blog-renderer.js?v=1.0.14" defer></script>
   </body>
 </html>

@@ -339,17 +339,18 @@ async function handleUrlRoute(url: string) {
   }
 }
 
-function initSearchDatabase() {
-  const searchElement = document.getElementById("search-data");
-  if (searchElement) {
-    try {
-      searchDatabase = JSON.parse(decrypt(searchElement.textContent || ""));
+async function initSearchDatabase() {
+  try {
+    const response = await fetch("/search.json/");
+    if (response.ok) {
+      const rawText = await response.text();
+      searchDatabase = JSON.parse(decrypt(rawText));
       if (typeof window !== "undefined") {
         (window as any).searchDatabase = searchDatabase;
       }
-    } catch (e) {
-      console.error("Failed to parse search database", e);
     }
+  } catch (e) {
+    console.error("Failed to fetch search database", e);
   }
 }
 
