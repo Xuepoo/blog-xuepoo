@@ -307,10 +307,25 @@ class BlogImage extends Entity {
 class CodeBlock extends Entity {
   constructor(text: string, width: number) {
     super();
-    const t = new Text(text, {
+    let wrappedText = "";
+    if (width > 0) {
+      const charsPerLine = Math.floor((width - 32) / 8.4);
+      for (const line of text.split("\n")) {
+        let currentLine = line;
+        while (currentLine.length > charsPerLine) {
+          wrappedText += currentLine.substring(0, charsPerLine) + "\n";
+          currentLine = currentLine.substring(charsPerLine);
+        }
+        wrappedText += currentLine + "\n";
+      }
+      if (wrappedText.endsWith("\n")) wrappedText = wrappedText.slice(0, -1);
+    } else {
+      wrappedText = text;
+    }
+
+    const t = new Text(wrappedText, {
       font: "14px monospace",
       color: "#332f29",
-      maxWidth: width - 32,
       preserveLeadingSpaces: true,
       lineHeight: 22,
     });
@@ -389,10 +404,10 @@ class AnimatedPostItem extends Entity {
 // ─── Reading Progress Bar (Easing.easeOutCubic) ───────────────────────────────
 
 class ReadingProgressBar extends Entity {
-  private scrollRef: ScrollView;
+  private scrollRef: Container;
   private displayProgress = 0;
 
-  constructor(scrollRef: ScrollView, width: number) {
+  constructor(scrollRef: Container, width: number) {
     super();
     this.scrollRef = scrollRef;
     this.width = width;
@@ -401,8 +416,8 @@ class ReadingProgressBar extends Entity {
 
   public update(dt: number, time: number): void {
     super.update(dt, time);
-    const scrollY = -(this.scrollRef as any).content.y;
-    const maxScroll = Math.max(1, (this.scrollRef as any).content.height - this.scrollRef.height);
+    const scrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+    const maxScroll = Math.max(1, this.scrollRef.height - window.innerHeight);
     const target = Math.min(1, Math.max(0, scrollY / maxScroll));
 
     // Smooth eased interpolation toward actual scroll position
@@ -509,33 +524,21 @@ function renderApp() {
   const contentWidth = Math.min(920, width - 40);
   const originX = (width - contentWidth) / 2;
 
-  // ── Scroll setup ─────────────────────────────────────────────────────────────
-  // Scene.ts only attaches pointermove/pointerdown/pointerleave to the canvas.
-  // Wheel events are NOT forwarded to entities, so we attach directly to the
-  // canvas here and manually drive ScrollView's spring target.
-  const canvas = (currentScene as any).canvas as HTMLCanvasElement;
-
-  // Remove any previously registered wheel handler (renderApp is called on resize)
-  if (_canvasWheelHandler) {
-    canvas.removeEventListener("wheel", _canvasWheelHandler);
-    _canvasWheelHandler = null;
-  }
-
-  const mainScroll = new ScrollView({ width, height });
+  const mainScroll = new Container();
   currentScene.add(mainScroll);
 
-  // Attach wheel handler to canvas directly — non-passive so we can preventDefault
-  _canvasWheelHandler = (e: WheelEvent) => {
-    if (e.ctrlKey) return; // leave Ctrl+wheel for browser zoom
-    e.preventDefault();
-    const sv = mainScroll as any;
-    sv.targetY -= e.deltaY;
-    sv.clampTarget();
-    (mainScroll.content as any).jumpTo(sv.targetY);
-    // Wake the onDemand render loop and keep it alive while spring settles
-    currentScene?.markDirty();
-  };
-  canvas.addEventListener("wheel", _canvasWheelHandler, { passive: false });
+  if (!_canvasWheelHandler) {
+    _canvasWheelHandler = (e: Event) => {}; // No-op, just to satisfy the type
+
+    // Enable native scrolling on body
+    document.body.style.overflow = "auto";
+    document.documentElement.style.overflow = "auto";
+
+    window.addEventListener("scroll", () => {
+      mainScroll.y = -window.scrollY;
+      currentScene?.markDirty();
+    });
+  }
 
   // Keep the spring-scroll rendering while the content is still moving
   // by attaching a lightweight update hook on the content entity.
@@ -865,9 +868,11 @@ function renderApp() {
   page.add(footerContainer);
   page.height = footerY + 80;
 
-  // IMPORTANT: Since page was added to mainScroll *before* we populated it,
-  // we must inform mainScroll to re-measure its bounds so scrolling actually works.
-  mainScroll.updateContentSize();
+  // IMPORTANT: Set the document body height so native scrolling works
+  if (typeof document !== 'undefined') {
+    document.body.style.height = `${footerY + 80}px`;
+    mainScroll.height = footerY + 80;
+  }
 }
 
 // ─── View Tracking ────────────────────────────────────────────────────────────
