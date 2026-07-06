@@ -1,5 +1,5 @@
-import { Scene, Entity } from "@vecto-ui/core";
-import { ScrollView, Text, RichText, Input, Card } from "@vecto-ui/ui";
+import { Scene, Entity } from "@vectojs/core";
+import { ScrollView, Text, RichText, Input, Card } from "@vectojs/ui";
 
 const key = 42;
 
@@ -31,8 +31,11 @@ let currentScene: Scene | null = null;
 let currentPageData: any = null;
 let searchDatabase: any[] = [];
 let searchDropdown: any = null;
+let currentSearchMatches: any[] = [];
 let viewsMap = new Map<string, number>();
 const imageCache = new Map<string, { img: HTMLImageElement; aspectRatio: number }>();
+// Wheel handler attached to the canvas for scroll (Scene does not forward wheel events)
+let _canvasWheelHandler: ((e: WheelEvent) => void) | null = null;
 
 // HTML tags to RichText spans
 function parseHtmlToSpans(html: string): any[] {
@@ -166,7 +169,8 @@ function parseHtmlToBlocks(html: string): ContentBlock[] {
   return blocks;
 }
 
-// VectoUI Custom components to represent HTML blocks
+// ─── Custom Entity Components ─────────────────────────────────────────────────
+
 class QuoteBlock extends Entity {
   constructor(spans: any[], width: number) {
     super();
@@ -198,9 +202,8 @@ class MathBlock extends Entity {
   constructor(htmlContent: string, width: number) {
     super();
     this.width = width;
-    this.height = 60; // fallback height until loaded
+    this.height = 60;
 
-    // Create a temporary container to measure the KaTeX size
     const container = document.createElement("div");
     container.style.position = "absolute";
     container.style.visibility = "hidden";
@@ -214,7 +217,6 @@ class MathBlock extends Entity {
     const h = container.offsetHeight || 40;
     this.height = h + 20;
 
-    // Serialize to SVG
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
         <foreignObject width="100%" height="100%">
@@ -264,7 +266,7 @@ class BlogImage extends Entity {
       this.img = cached.img;
       this.height = Math.round(this.maxWidth * cached.aspectRatio);
     } else {
-      this.height = 300; // placeholder height until loaded
+      this.height = 300;
       if (typeof window !== "undefined") {
         const img = new window.Image();
         img.onload = () => {
@@ -275,11 +277,9 @@ class BlogImage extends Entity {
           const aspectRatio = h / w;
           this.height = Math.round(this.maxWidth * aspectRatio);
           imageCache.set(src, { img, aspectRatio });
-          // Force re-layout and repaint page container once
           renderPage();
         };
         img.onerror = () => {
-          // Fallback height for broken or blocked image URLs
           this.loaded = false;
           const aspectRatio = 150 / this.maxWidth;
           this.height = 150;
@@ -350,81 +350,107 @@ class Container extends Entity {
   public render(_r: any): void {}
 }
 
-class SmoothScrollView extends ScrollView {
-  constructor(options: any) {
-    super(options);
-    // Wake up the scene rendering loop on user interaction in onDemand mode
-    this.on("wheel", () => {
-      this.scene?.markDirty();
-    });
-    this.on("pointerdown", () => {
-      this.scene?.markDirty();
-    });
-    this.on("pointermove", () => {
-      this.scene?.markDirty();
-    });
-  }
+// ─── BlogScrollView: wraps new ScrollView and wakes onDemand scene ───────────
 
-  public update(dt: number, time: number): void {
-    // Bypass ScrollView's frame-rate dependent update and update via Entity prototype
-    Entity.prototype.update.call(this, dt, time);
+// ─── Post Card with Hover Highlight (no y-shift to avoid layout overlap) ──────
 
-    const self = this as any;
-    const maxScroll = Math.max(0, this.content.height - this.height);
+class AnimatedPostItem extends Entity {
+  private hovered = false;
 
-    // Clamp target scroll
-    if (self.targetY > 0) self.targetY = 0;
-    else if (self.targetY < -maxScroll) self.targetY = -maxScroll;
-
-    // Critically damped exponential decay for frame-rate independent smooth scrolling
-    const diff = self.targetY - this.content.y;
-    if (Math.abs(diff) > 0.05) {
-      // dt is in milliseconds, divide by 1000 to scale to seconds for a smooth 15Hz damping curve
-      this.content.y += diff * (1 - Math.exp(-15 * (dt / 1000)));
-      this.scene?.markDirty();
-    } else {
-      this.content.y = self.targetY;
-    }
-  }
-}
-
-class ReadingProgressBar extends Entity {
-  private scrollRef: SmoothScrollView;
-
-  constructor(scrollRef: SmoothScrollView, width: number) {
+  constructor(width: number) {
     super();
-    this.scrollRef = scrollRef;
     this.width = width;
-    this.height = 3; // 3px thin progress bar for ultra-premium look
-  }
+    this.interactive = true;
+    this.height = 0;
 
-  public update(dt: number, time: number): void {
-    super.update(dt, time);
-    this.scene?.markDirty();
+    // Only change the background on hover — no y movement which would cause
+    // visual overlap with adjacent layout items.
+    this.on("pointerenter", () => {
+      this.hovered = true;
+      currentScene?.markDirty();
+    });
+    this.on("pointerleave", () => {
+      this.hovered = false;
+      currentScene?.markDirty();
+    });
   }
 
   public render(r: any): void {
-    const scrollY = -this.scrollRef.content.y;
-    const maxScroll = Math.max(1, this.scrollRef.content.height - this.scrollRef.height);
-    const progress = Math.min(1, Math.max(0, scrollY / maxScroll));
-
-    if (progress > 0) {
+    if (this.hovered) {
       r.save();
-      // Draw background bar container with light opacity
       r.beginPath();
-      r.roundRect(0, 0, this.width, this.height, 0);
-      r.fill("rgba(140, 118, 92, 0.15)");
-
-      // Draw progressive bar in primary theme color (#8c765c)
-      r.beginPath();
-      r.roundRect(0, 0, this.width * progress, this.height, 0);
-      r.fill("#8c765c");
+      r.roundRect(-12, -8, this.width + 24, this.height + 16, 8);
+      r.fill("rgba(140, 118, 92, 0.07)");
       r.restore();
     }
   }
 }
 
-// Router & transition
+// ─── Reading Progress Bar (Easing.easeOutCubic) ───────────────────────────────
+
+class ReadingProgressBar extends Entity {
+  private scrollRef: ScrollView;
+  private displayProgress = 0;
+
+  constructor(scrollRef: ScrollView, width: number) {
+    super();
+    this.scrollRef = scrollRef;
+    this.width = width;
+    this.height = 3;
+  }
+
+  public update(dt: number, time: number): void {
+    super.update(dt, time);
+    const scrollY = -(this.scrollRef as any).content.y;
+    const maxScroll = Math.max(1, (this.scrollRef as any).content.height - this.scrollRef.height);
+    const target = Math.min(1, Math.max(0, scrollY / maxScroll));
+
+    // Smooth eased interpolation toward actual scroll position
+    const diff = target - this.displayProgress;
+    if (Math.abs(diff) > 0.001) {
+      this.displayProgress += diff * (1 - Math.exp(-18 * (dt / 1000)));
+      this.scene?.markDirty();
+    } else {
+      this.displayProgress = target;
+    }
+  }
+
+  public render(r: any): void {
+    if (this.displayProgress <= 0) return;
+    r.save();
+    r.beginPath();
+    r.roundRect(0, 0, this.width, this.height, 0);
+    r.fill("rgba(140, 118, 92, 0.12)");
+
+    r.beginPath();
+    r.roundRect(0, 0, this.width * this.displayProgress, this.height, 0);
+    r.fill("#8c765c");
+    r.restore();
+  }
+}
+
+// ─── Page Container with Fade-in Transition (opacity only, no y-shift) ────────
+
+class PageContainer extends Entity {
+  constructor() {
+    super();
+    // Use opacity-only fade: changing y would disturb the layout for children.
+    this.opacity = 0;
+    this.setTransition({
+      opacity: { duration: 340, easing: "easeOutCubic" },
+    });
+    // Fire after the current sync task so the entity is attached to the tree
+    Promise.resolve().then(() => {
+      this.opacity = 1;
+      this.scene?.markDirty();
+    });
+  }
+
+  public render(_r: any): void {}
+}
+
+// ─── Router & Navigation ─────────────────────────────────────────────────────
+
 async function navigateTo(url: string) {
   window.history.pushState({}, "", url);
   await handleUrlRoute(url);
@@ -450,7 +476,6 @@ async function handleUrlRoute(url: string) {
   }
 }
 
-// Initialize Search Database
 function initSearchDatabase() {
   const searchElement = document.getElementById("search-data");
   if (searchElement) {
@@ -465,11 +490,12 @@ function initSearchDatabase() {
   }
 }
 
-// Main Render Loop
+// ─── Main Render ──────────────────────────────────────────────────────────────
+
 function renderApp() {
   if (!currentScene || !currentPageData) return;
 
-  // Clear existing entities from scene properly, cleaning up their a11y elements
+  // Clear existing entities
   const root = (currentScene as any).root;
   if (root && root.children) {
     const kids = [...root.children];
@@ -483,26 +509,56 @@ function renderApp() {
   const contentWidth = Math.min(920, width - 40);
   const originX = (width - contentWidth) / 2;
 
-  // Create SmoothScrollView for entire page
-  const mainScroll = new SmoothScrollView({
-    width: width,
-    height: height,
-  });
+  // ── Scroll setup ─────────────────────────────────────────────────────────────
+  // Scene.ts only attaches pointermove/pointerdown/pointerleave to the canvas.
+  // Wheel events are NOT forwarded to entities, so we attach directly to the
+  // canvas here and manually drive ScrollView's spring target.
+  const canvas = (currentScene as any).canvas as HTMLCanvasElement;
+
+  // Remove any previously registered wheel handler (renderApp is called on resize)
+  if (_canvasWheelHandler) {
+    canvas.removeEventListener("wheel", _canvasWheelHandler);
+    _canvasWheelHandler = null;
+  }
+
+  const mainScroll = new ScrollView({ width, height });
   currentScene.add(mainScroll);
 
-  // Create and add ReadingProgressBar at the very top of the scene (fixed overlay)
+  // Attach wheel handler to canvas directly — non-passive so we can preventDefault
+  _canvasWheelHandler = (e: WheelEvent) => {
+    if (e.ctrlKey) return; // leave Ctrl+wheel for browser zoom
+    e.preventDefault();
+    const sv = mainScroll as any;
+    sv.targetY -= e.deltaY;
+    sv.clampTarget();
+    (mainScroll.content as any).jumpTo(sv.targetY);
+    // Wake the onDemand render loop and keep it alive while spring settles
+    currentScene?.markDirty();
+  };
+  canvas.addEventListener("wheel", _canvasWheelHandler, { passive: false });
+
+  // Keep the spring-scroll rendering while the content is still moving
+  // by attaching a lightweight update hook on the content entity.
+  const _origContentUpdate = mainScroll.content.update.bind(mainScroll.content);
+  mainScroll.content.update = function (dt: number, time: number) {
+    _origContentUpdate(dt, time);
+    if (this.hasPendingAnimations()) {
+      currentScene?.markDirty();
+    }
+  };
+
   const progressBar = new ReadingProgressBar(mainScroll, width);
   currentScene.add(progressBar);
 
-  // Attach debugging handles to window
   if (typeof window !== "undefined") {
     (window as any).currentScene = currentScene;
     (window as any).mainScroll = mainScroll;
   }
 
+
   let currentY = 20;
 
-  // 1. Title Header
+  // ── Header ──────────────────────────────────────────────────────────────────
   const headerContainer = new Container();
   headerContainer.setPosition(originX, currentY);
 
@@ -516,7 +572,6 @@ function renderApp() {
   );
   headerContainer.add(titleText);
 
-  // Search input on the right of header
   const searchInput = new Input({
     width: 150,
     height: 32,
@@ -544,11 +599,10 @@ function renderApp() {
           return post.tags && post.tags.some((tag: string) => tag.toLowerCase().includes(tagQuery));
         }
         const inTags = post.tags && post.tags.some((tag: string) => tag.toLowerCase().includes(query));
-        return inTags ||
-               title.includes(query) ||
-               desc.includes(query) ||
-               content.includes(query);
-      }).slice(0, 5); // top 5 results
+        return inTags || title.includes(query) || desc.includes(query) || content.includes(query);
+      }).slice(0, 5);
+
+      currentSearchMatches = matches;
 
       if (matches.length > 0) {
         searchDropdown = new Container();
@@ -565,9 +619,7 @@ function renderApp() {
           });
           card.setPosition(0, dy);
           card.interactive = true;
-          card.on("click", () => {
-            navigateTo(match.url);
-          });
+          card.on("pointerup", () => { navigateTo(match.url); });
 
           const cardTitle = new Text(match.title, {
             font: "12px Noto Sans SC, sans-serif",
@@ -593,45 +645,45 @@ function renderApp() {
     }
   });
   searchInput.setPosition(contentWidth - 150, 0);
-
   headerContainer.add(searchInput);
   mainScroll.add(headerContainer);
 
   currentY += 80;
 
-  // Divider
+  // ── Divider ─────────────────────────────────────────────────────────────────
   const divider = new DividerLine(contentWidth);
   divider.setPosition(originX, currentY);
   mainScroll.add(divider);
 
   currentY += 40;
 
-  // 2. Content Area
+  // ── Fade-in page wrapper ─────────────────────────────────────────────────────
+  const page = new PageContainer();
+  page.setPosition(originX, currentY + 24); // start 24px lower, slides up
+  mainScroll.add(page);
+
   const payload = currentPageData.data;
 
   if (payload.type === "index" || payload.type === "taxonomy_single") {
-    // Post List View
-    const listContainer = new Container();
-    listContainer.setPosition(originX, currentY);
-
+    // ── Post List ────────────────────────────────────────────────────────────
     let listY = 0;
 
     if (payload.type === "taxonomy_single") {
-      const heading = new Text(`关于 “${payload.term}” 的所有文章`, {
+      const heading = new Text(`关于 "${payload.term}" 的所有文章`, {
         font: "600 20px Noto Sans SC, sans-serif",
         color: "#332f29",
       });
       heading.setPosition(0, listY);
-      listContainer.add(heading);
+      page.add(heading);
       listY += 40;
     }
 
     const posts = payload.posts || [];
     for (const post of posts) {
-      const postItem = new Container();
+      // Animated post item with spring hover
+      const postItem = new AnimatedPostItem(contentWidth);
       postItem.setPosition(0, listY);
 
-      // Title
       const postTitle = new RichText(
         [{ text: post.title, style: { bold: true, href: post.url } }],
         {
@@ -644,7 +696,6 @@ function renderApp() {
 
       let itemY = postTitle.height + 8;
 
-      // Meta: Date, read count, tags
       const views = viewsMap.get(post.slug) ?? 0;
       let metaText = `${post.date} · 阅读: ${views} 次`;
       if (post.tags && post.tags.length > 0) {
@@ -660,7 +711,6 @@ function renderApp() {
 
       itemY += 24;
 
-      // Summary
       const summaryText = new RichText(
         parseHtmlToSpans(post.summary || post.description || ""),
         {
@@ -674,7 +724,6 @@ function renderApp() {
 
       itemY += summaryText.height + 16;
 
-      // Read More
       const readMore = new RichText(
         [{ text: "阅读全文 →", style: { color: "#8c765c", href: post.url } }],
         {
@@ -687,36 +736,31 @@ function renderApp() {
 
       itemY += readMore.height + 30;
 
-      // Inner divider
       const innerDiv = new DividerLine(contentWidth);
       innerDiv.setPosition(0, itemY);
       postItem.add(innerDiv);
 
-      listContainer.add(postItem);
+      postItem.height = itemY + 1;
+      page.add(postItem);
       listY += itemY + 40;
     }
 
-    mainScroll.add(listContainer);
-    currentY += listY;
-  } else if (payload.type === "page") {
-    // Post Detail View
-    const pageContainer = new Container();
-    pageContainer.setPosition(originX, currentY);
+    page.height = listY;
 
+  } else if (payload.type === "page") {
+    // ── Post Detail ──────────────────────────────────────────────────────────
     let detailY = 0;
 
-    // Title
     const pageTitle = new Text(payload.title, {
       font: "600 36px Noto Serif SC, serif",
       color: "#332f29",
       maxWidth: contentWidth,
     });
     pageTitle.setPosition(0, detailY);
-    pageContainer.add(pageTitle);
+    page.add(pageTitle);
 
     detailY += pageTitle.height + 12;
 
-    // Meta
     const views = viewsMap.get(payload.slug) ?? 0;
     let metaText = `${payload.date} · 字数: ${payload.word_count} 字 · 阅读: ${views} 次`;
     if (payload.tags && payload.tags.length > 0) {
@@ -728,11 +772,10 @@ function renderApp() {
       color: "#7a7265",
     });
     pageMeta.setPosition(0, detailY);
-    pageContainer.add(pageMeta);
+    page.add(pageMeta);
 
     detailY += pageMeta.height + 40;
 
-    // Parse HTML content into vertical layout blocks
     const contentBlocks = parseHtmlToBlocks(payload.content);
     for (const block of contentBlocks) {
       let blockEntity: Entity;
@@ -742,21 +785,10 @@ function renderApp() {
       } else if (block.codeLang === "math") {
         blockEntity = new MathBlock(block.text || "", contentWidth);
       } else if (
-        block.type === "h1" ||
-        block.type === "h2" ||
-        block.type === "h3" ||
-        block.type === "h4" ||
-        block.type === "h5" ||
-        block.type === "h6"
+        block.type === "h1" || block.type === "h2" || block.type === "h3" ||
+        block.type === "h4" || block.type === "h5" || block.type === "h6"
       ) {
-        const fs =
-          block.type === "h1"
-            ? 32
-            : block.type === "h2"
-              ? 26
-              : block.type === "h3"
-                ? 21
-                : 18;
+        const fs = block.type === "h1" ? 32 : block.type === "h2" ? 26 : block.type === "h3" ? 21 : 18;
         blockEntity = new RichText(block.spans || [], {
           font: `600 ${fs}px Noto Serif SC, serif`,
           color: "#332f29",
@@ -767,7 +799,6 @@ function renderApp() {
       } else if (block.type === "blockquote") {
         blockEntity = new QuoteBlock(block.spans || [], contentWidth);
       } else {
-        // regular paragraph
         blockEntity = new RichText(block.spans || [], {
           font: "16px Noto Serif SC, serif",
           color: "#332f29",
@@ -776,7 +807,7 @@ function renderApp() {
       }
 
       blockEntity.setPosition(0, detailY);
-      pageContainer.add(blockEntity);
+      page.add(blockEntity);
       detailY += blockEntity.height + 24;
     }
 
@@ -788,10 +819,7 @@ function renderApp() {
       const ear = payload.navigation.earlier;
       const prev = new RichText(
         [{ text: `← ${ear.title}`, style: { color: "#8c765c", href: ear.url } }],
-        {
-          font: "14px Noto Sans SC, sans-serif",
-          onLinkClick: () => navigateTo(ear.url),
-        }
+        { font: "14px Noto Sans SC, sans-serif", onLinkClick: () => navigateTo(ear.url) }
       );
       prev.setPosition(0, 0);
       navEntity.add(prev);
@@ -801,73 +829,49 @@ function renderApp() {
       const lat = payload.navigation.later;
       const nextText = new RichText(
         [{ text: `${lat.title} →`, style: { color: "#8c765c", href: lat.url } }],
-        {
-          font: "14px Noto Sans SC, sans-serif",
-          onLinkClick: () => navigateTo(lat.url),
-        }
+        { font: "14px Noto Sans SC, sans-serif", onLinkClick: () => navigateTo(lat.url) }
       );
       nextText.setPosition(contentWidth - nextText.width, 0);
       navEntity.add(nextText);
     }
 
-    pageContainer.add(navEntity);
+    page.add(navEntity);
     detailY += 40;
 
-    // Back to list
     detailY += 20;
     const backBtn = new RichText(
       [{ text: "← 返回列表", style: { color: "#8c765c", href: "/" } }],
-      {
-        font: "14px Noto Sans SC, sans-serif",
-        onLinkClick: () => navigateTo("/"),
-      }
+      { font: "14px Noto Sans SC, sans-serif", onLinkClick: () => navigateTo("/") }
     );
     backBtn.setPosition(0, detailY);
-    pageContainer.add(backBtn);
+    page.add(backBtn);
 
     detailY += backBtn.height + 40;
-
-    mainScroll.add(pageContainer);
-    currentY += detailY;
+    page.height = detailY;
   }
 
-  // 3. Footer
-  currentY += 40;
+  // ── Footer ───────────────────────────────────────────────────────────────────
+  const footerY = page.height + 60;
   const footerContainer = new Container();
-  footerContainer.setPosition(originX, currentY);
+  footerContainer.setPosition(0, footerY);
 
-  const footerText = new Text(`© ${new Date().getFullYear()} Xuepoo. Crafted in VectoUI.`, {
+  const footerText = new Text(`© ${new Date().getFullYear()} Xuepoo. Crafted in VectoJS.`, {
     font: "12px Noto Sans SC, sans-serif",
     color: "#7a7265",
   });
   footerText.setPosition(0, 0);
   footerContainer.add(footerText);
 
-  mainScroll.add(footerContainer);
+  page.add(footerContainer);
+  page.height = footerY + 80;
 
-  currentY += 80;
-
-  // ScrollView automatically updates its bounds when children are added
-  try {
-    const debugNodeTree = (node: any, path: string = "root") => {
-      if (!node) return;
-      const name = node.constructor ? (node.constructor.name || "UnknownClass") : "NullConstructor";
-      const hasRender = typeof node.render === "function";
-      console.log(`[DebugTree] ${path} -> ${name} (hasRender: ${hasRender})`);
-      if (node.children && Array.isArray(node.children)) {
-        for (let i = 0; i < node.children.length; i++) {
-          debugNodeTree(node.children[i], `${path}.${name}[${i}]`);
-        }
-      }
-    };
-    console.log("=== Debugging Node Tree ===");
-    debugNodeTree((currentScene as any).root);
-  } catch (e) {
-    console.error("Failed to run debugNodeTree", e);
-  }
+  // IMPORTANT: Since page was added to mainScroll *before* we populated it,
+  // we must inform mainScroll to re-measure its bounds so scrolling actually works.
+  mainScroll.updateContentSize();
 }
 
-// Batch load view counts from CF Functions endpoint
+// ─── View Tracking ────────────────────────────────────────────────────────────
+
 async function loadViewCounts() {
   try {
     const res = await fetch("/api/views");
@@ -880,7 +884,6 @@ async function loadViewCounts() {
   }
 }
 
-// Log view count if we are on a page detail
 async function logCurrentPageView() {
   if (currentPageData?.data?.type === "page") {
     const slug = currentPageData.data.slug;
@@ -897,7 +900,8 @@ async function logCurrentPageView() {
   }
 }
 
-// Entry point
+// ─── Entry Point ──────────────────────────────────────────────────────────────
+
 document.addEventListener("DOMContentLoaded", async () => {
   const canvas = document.getElementById("vecto-canvas") as HTMLCanvasElement;
   if (!canvas) return;
@@ -906,40 +910,34 @@ document.addEventListener("DOMContentLoaded", async () => {
   currentScene.renderMode = "onDemand";
   currentScene.start();
 
-  // Trigger initial resize event to let VectoUI establish internal HiDPI boundaries
   window.dispatchEvent(new Event("resize"));
 
-  // Load search data
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && searchDropdown && currentSearchMatches.length > 0) {
+      navigateTo(currentSearchMatches[0].url);
+    }
+  });
+
   initSearchDatabase();
 
-  // Load page-specific data
   const dataElement = document.getElementById("page-data");
   if (dataElement) {
     currentPageData = parsePageData(dataElement.textContent || "");
   }
 
-  // Fetch view counts and update
   await loadViewCounts();
   await logCurrentPageView();
 
-  // Render initial page
   renderPage();
 
-  // Handle window resizing
-  window.addEventListener("resize", () => {
-    renderPage();
-  });
+  window.addEventListener("resize", () => { renderPage(); });
 
-  // Handle browser navigation back/forward
   window.addEventListener("popstate", async () => {
     await handleUrlRoute(window.location.pathname);
   });
 
-  // Trigger re-render when custom web fonts finish loading to recalculate glyph widths correctly
   if (typeof document !== "undefined" && (document as any).fonts) {
-    (document as any).fonts.ready.then(() => {
-      renderPage();
-    });
+    (document as any).fonts.ready.then(() => { renderPage(); });
   }
 });
 
