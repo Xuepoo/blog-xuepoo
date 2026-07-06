@@ -363,13 +363,21 @@ async function initSearchDatabase() {
     const response = await fetch("/search.json/");
     if (response.ok) {
       const rawText = await response.text();
-      searchDatabase = JSON.parse(decrypt(rawText));
-      if (typeof window !== "undefined") {
-        (window as any).searchDatabase = searchDatabase;
+      if (rawText.trim().startsWith("<")) {
+        console.warn("Search database not found (returned HTML).");
+        return;
+      }
+      try {
+        searchDatabase = JSON.parse(decrypt(rawText));
+        if (typeof window !== "undefined") {
+          (window as any).searchDatabase = searchDatabase;
+        }
+      } catch (parseError) {
+        console.warn("Failed to parse search database JSON:", parseError);
       }
     }
   } catch (e) {
-    console.error("Failed to fetch search database", e);
+    console.warn("Failed to fetch search database", e);
   }
 }
 
