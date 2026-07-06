@@ -662,7 +662,7 @@ function renderApp() {
 
     let rawMarkdown = payload.raw_content || "";
     // Strip Zola TOML and YAML frontmatter
-    rawMarkdown = rawMarkdown.replace(/^(?:\+\+\+|---)[\s\S]*?(?:\+\+\+|---)\n*/, "");
+    rawMarkdown = rawMarkdown.trimStart().replace(/^(?:\+\+\+|---)[\s\S]*?(?:\+\+\+|---)\n*/, "");
     const md = new CustomMarkdown(rawMarkdown, {
       maxWidth: contentWidth,
       theme: {
