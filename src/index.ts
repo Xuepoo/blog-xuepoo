@@ -398,6 +398,7 @@ function renderApp() {
   const width = window.innerWidth;
   const height = window.innerHeight;
   const contentWidth = Math.min(920, width - 40);
+  const isMobile = contentWidth < 600;
   const originX = (width - contentWidth) / 2;
 
   const mainScroll = new Container();
@@ -529,11 +530,18 @@ function renderApp() {
       currentScene?.markDirty();
     }
   });
-  searchInput.setPosition(contentWidth - 150, 0);
-  headerContainer.add(searchInput);
-  mainScroll.add(headerContainer);
-
-  currentY += 80;
+  if (isMobile) {
+    searchInput.setPosition(0, 45);
+    searchInput.width = contentWidth;
+    headerContainer.add(searchInput);
+    mainScroll.add(headerContainer);
+    currentY += 120;
+  } else {
+    searchInput.setPosition(contentWidth - 150, 0);
+    headerContainer.add(searchInput);
+    mainScroll.add(headerContainer);
+    currentY += 80;
+  }
 
   // ── Divider ─────────────────────────────────────────────────────────────────
   const divider = new DividerLine(contentWidth);
@@ -643,8 +651,10 @@ function renderApp() {
     // ── Post Detail ──────────────────────────────────────────────────────────
     let detailY = 0;
 
-    const pageTitle = new Text(payload.title, {
-      font: "600 36px Noto Serif SC, serif",
+    const pageTitle = new RichText(payload.title || "Untitled", {
+      fontSize: isMobile ? 32 : 44,
+      lineHeight: 1.4,
+      fontFamily: "STKaiti, KaiTi, serif",
       color: "#332f29",
       maxWidth: contentWidth,
     });
@@ -674,8 +684,8 @@ function renderApp() {
     const md = new CustomMarkdown(rawMarkdown, {
       maxWidth: contentWidth,
       theme: {
-        bodyFont: "18px Noto Serif SC, serif",
-        codeFont: "16px monospace",
+        bodyFont: isMobile ? "18px Noto Serif SC, serif" : "22px Noto Serif SC, serif",
+        codeFont: isMobile ? "14px monospace" : "18px monospace",
         textColor: "#332f29",
         headingColor: "#332f29",
         codeColor: "#8c765c",
@@ -683,7 +693,7 @@ function renderApp() {
         quoteBorderColor: "#8c765c",
         quoteTextColor: "#7a7265",
         hrColor: "#e8dfd0",
-        fontSize: 18,
+        fontSize: isMobile ? 18 : 22,
       },
       onLinkClick: (url: string) => navigateTo(url)
     });
