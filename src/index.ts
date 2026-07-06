@@ -540,16 +540,6 @@ function renderApp() {
     });
   }
 
-  // Keep the spring-scroll rendering while the content is still moving
-  // by attaching a lightweight update hook on the content entity.
-  const _origContentUpdate = mainScroll.content.update.bind(mainScroll.content);
-  mainScroll.content.update = function (dt: number, time: number) {
-    _origContentUpdate(dt, time);
-    if (this.hasPendingAnimations()) {
-      currentScene?.markDirty();
-    }
-  };
-
   const progressBar = new ReadingProgressBar(mainScroll, width);
   currentScene.add(progressBar);
 
