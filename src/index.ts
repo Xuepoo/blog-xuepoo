@@ -527,6 +527,19 @@ function renderApp() {
 
   const mainScroll = new Container();
   currentMainScroll = mainScroll;
+
+  // Enable buttery smooth scrolling interpolation for mouse wheels
+  mainScroll.setTransition({ y: "spring" });
+
+  // Keep the VectoJS render loop alive while the scrolling spring settles
+  const _origUpdate = mainScroll.update.bind(mainScroll);
+  mainScroll.update = function(dt: number, time: number) {
+    _origUpdate(dt, time);
+    if (this.hasPendingAnimations()) {
+      currentScene?.markDirty();
+    }
+  };
+
   currentScene.add(mainScroll);
 
   if (!_canvasWheelHandler) {
