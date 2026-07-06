@@ -125,6 +125,7 @@ class BlogImage extends Entity {
           const aspectRatio = h / w;
           this.height = Math.round(this.maxWidth * aspectRatio);
           imageCache.set(src, { img, aspectRatio });
+          requestLayout(this);
           currentScene?.markDirty();
         };
         img.onerror = () => {
@@ -132,6 +133,7 @@ class BlogImage extends Entity {
           const aspectRatio = 150 / this.maxWidth;
           this.height = 150;
           imageCache.set(src, { img, aspectRatio });
+          requestLayout(this);
           currentScene?.markDirty();
         };
         img.src = src;
@@ -149,6 +151,23 @@ class BlogImage extends Entity {
       r.fill("#ede4d3");
       r.restore();
     }
+  }
+}
+
+function requestLayout(entity: any) {
+  let curr = entity;
+  while (curr) {
+    if (curr.content && typeof curr.content.layout === 'function') {
+      curr.content.layout();
+      curr.width = curr.content.width;
+      curr.height = curr.content.height;
+    } else if (typeof curr.layout === 'function') {
+      curr.layout();
+    }
+    if (typeof curr.onHeightChanged === 'function') {
+      curr.onHeightChanged();
+    }
+    curr = curr.parent;
   }
 }
 
@@ -642,13 +661,13 @@ function renderApp() {
     detailY += pageMeta.height + 40;
 
     let rawMarkdown = payload.raw_content || "";
-    // Strip Zola TOML frontmatter
-    rawMarkdown = rawMarkdown.replace(/^\+\+\+[\s\S]*?\+\+\+\n*/, "");
+    // Strip Zola TOML and YAML frontmatter
+    rawMarkdown = rawMarkdown.replace(/^(?:\+\+\+|---)[\s\S]*?(?:\+\+\+|---)\n*/, "");
     const md = new CustomMarkdown(rawMarkdown, {
       maxWidth: contentWidth,
       theme: {
-        bodyFont: "16px Noto Serif SC, serif",
-        codeFont: "14px monospace",
+        bodyFont: "18px Noto Serif SC, serif",
+        codeFont: "16px monospace",
         textColor: "#332f29",
         headingColor: "#332f29",
         codeColor: "#8c765c",
@@ -656,7 +675,7 @@ function renderApp() {
         quoteBorderColor: "#8c765c",
         quoteTextColor: "#7a7265",
         hrColor: "#e8dfd0",
-        fontSize: 16,
+        fontSize: 18,
       },
       onLinkClick: (url: string) => navigateTo(url)
     });
@@ -701,11 +720,34 @@ function renderApp() {
 
     detailY += backBtn.height + 40;
     page.height = detailY;
+
+    (md as any).onHeightChanged = () => {
+      let nextY = md.y + md.height + 24;
+      navEntity.setPosition(0, nextY);
+      nextY += 40 + 20;
+      backBtn.setPosition(0, nextY);
+      nextY += backBtn.height + 40;
+
+      page.height = nextY;
+      const f = (page as any)._footer;
+      if (f) {
+        const footerY = page.height + 60;
+        f.setPosition(0, footerY);
+        page.height = footerY + 80;
+      }
+
+      if (typeof document !== 'undefined') {
+        document.body.style.height = `${page.height}px`;
+        mainScroll.height = page.height;
+      }
+      currentScene?.markDirty();
+    };
   }
 
   // ── Footer ───────────────────────────────────────────────────────────────────
   const footerY = page.height + 60;
   const footerContainer = new Container();
+  (page as any)._footer = footerContainer;
   footerContainer.setPosition(0, footerY);
 
   const footerText = new Text(`© ${new Date().getFullYear()} Xuepoo. Crafted in VectoJS.`, {
@@ -720,8 +762,8 @@ function renderApp() {
 
   // IMPORTANT: Set the document body height so native scrolling works
   if (typeof document !== 'undefined') {
-    document.body.style.height = `${footerY + 80}px`;
-    mainScroll.height = footerY + 80;
+    document.body.style.height = `${page.height}px`;
+    mainScroll.height = page.height;
   }
 
   currentScene.markDirty();
