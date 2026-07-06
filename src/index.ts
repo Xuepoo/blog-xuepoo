@@ -38,7 +38,160 @@ const imageCache = new Map<string, { img: HTMLImageElement; aspectRatio: number 
 let _canvasWheelHandler: ((e: WheelEvent) => void) | null = null;
 let currentMainScroll: Container | null = null;
 
-// HTML tag parser removed. Using native VectoJS Markdown component.
+import { marked, type Token } from "marked";
+import katex from "katex";
+
+class MathBlock extends Entity {
+  private img: HTMLImageElement | null = null;
+  private loaded = false;
+
+  constructor(htmlContent: string, width: number) {
+    super();
+    this.width = width;
+    this.height = 60;
+
+    const container = document.createElement("div");
+    container.style.position = "absolute";
+    container.style.visibility = "hidden";
+    container.style.color = "#332f29";
+    container.style.fontFamily = "Noto Serif SC, serif";
+    container.style.width = `${width}px`;
+    container.innerHTML = htmlContent;
+    document.body.appendChild(container);
+
+    const w = container.offsetWidth || width;
+    const h = container.offsetHeight || 40;
+    this.height = h + 20;
+
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+        <foreignObject width="100%" height="100%">
+          <div xmlns="http://www.w3.org/1999/xhtml" style="color: #332f29; font-family: 'Noto Serif SC', serif; line-height: 1.85;">
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" />
+            ${htmlContent}
+          </div>
+        </foreignObject>
+      </svg>
+    `;
+
+    document.body.removeChild(container);
+
+    const img = new Image();
+    img.onload = () => {
+      this.img = img;
+      this.loaded = true;
+      this.width = w;
+      this.height = h + 20;
+      currentScene?.markDirty();
+    };
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.trim());
+  }
+
+  public render(r: any): void {
+    if (this.loaded && this.img) {
+      r.drawImage(this.img, Math.max(0, (this.width - this.img.width) / 2), 10);
+    }
+  }
+}
+
+class BlogImage extends Entity {
+  private img: HTMLImageElement | null = null;
+  private loaded = false;
+  private src: string;
+  private alt: string;
+  private maxWidth: number;
+
+  constructor(src: string, alt: string, maxWidth: number) {
+    super();
+    this.src = src;
+    this.alt = alt;
+    this.maxWidth = maxWidth;
+    this.width = maxWidth;
+
+    const cached = imageCache.get(src);
+    if (cached) {
+      this.loaded = true;
+      this.img = cached.img;
+      this.height = Math.round(this.maxWidth * cached.aspectRatio);
+    } else {
+      this.height = 300;
+      if (typeof window !== "undefined") {
+        const img = new window.Image();
+        img.onload = () => {
+          this.loaded = true;
+          this.img = img;
+          const w = img.naturalWidth || 1;
+          const h = img.naturalHeight || 1;
+          const aspectRatio = h / w;
+          this.height = Math.round(this.maxWidth * aspectRatio);
+          imageCache.set(src, { img, aspectRatio });
+          currentScene?.markDirty();
+        };
+        img.onerror = () => {
+          this.loaded = false;
+          const aspectRatio = 150 / this.maxWidth;
+          this.height = 150;
+          imageCache.set(src, { img, aspectRatio });
+          currentScene?.markDirty();
+        };
+        img.src = src;
+      }
+    }
+  }
+
+  public render(r: any): void {
+    if (this.loaded && this.img) {
+      r.drawImage(this.img, 0, 0, this.width, this.height);
+    } else {
+      r.save();
+      r.beginPath();
+      r.roundRect(0, 0, this.width, this.height, 6);
+      r.fill("#ede4d3");
+      r.restore();
+    }
+  }
+}
+
+const mathExtension = {
+  name: 'math',
+  level: 'block',
+  start(src: string) { return src.match(/\$\$/)?.index; },
+  tokenizer(src: string, tokens: any) {
+    const match = /^\$\$([\s\S]+?)\$\$/.exec(src);
+    if (match) {
+      return {
+        type: 'math',
+        raw: match[0],
+        text: match[1].trim(),
+      };
+    }
+  },
+  renderer(token: any) { return token.text; }
+};
+marked.use({ extensions: [mathExtension] });
+
+export class CustomMarkdown extends Markdown {
+  protected renderToken(token: Token): Entity | null {
+    if (token.type === 'math') {
+      try {
+        const htmlContent = katex.renderToString((token as any).text, { displayMode: true, throwOnError: false });
+        return new MathBlock(htmlContent, this.maxWidth);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    if (token.type === 'paragraph') {
+      const pToken = token as any;
+      if (pToken.tokens && pToken.tokens.length === 1 && pToken.tokens[0].type === 'image') {
+        const imgToken = pToken.tokens[0];
+        return new BlogImage(imgToken.href, imgToken.text, this.maxWidth);
+      }
+    }
+
+    return super.renderToken(token);
+  }
+}
 
 class DividerLine extends Entity {
   private color: string;
@@ -415,7 +568,7 @@ function renderApp() {
 
       itemY += 24;
 
-      const summaryText = new Markdown(post.summary || post.description || "", {
+      const summaryText = new CustomMarkdown(post.summary || post.description || "", {
         maxWidth: contentWidth,
         theme: {
           bodyFont: "15px Noto Serif SC, serif",
@@ -427,7 +580,8 @@ function renderApp() {
           quoteTextColor: "#7a7265",
           hrColor: "#e8dfd0",
           fontSize: 15,
-        }
+        },
+        onLinkClick: (url: string) => navigateTo(url)
       });
       summaryText.setPosition(0, itemY);
       postItem.add(summaryText);
@@ -487,7 +641,7 @@ function renderApp() {
     detailY += pageMeta.height + 40;
 
     const rawMarkdown = payload.raw_content || "";
-    const md = new Markdown(rawMarkdown, {
+    const md = new CustomMarkdown(rawMarkdown, {
       maxWidth: contentWidth,
       theme: {
         bodyFont: "16px Noto Serif SC, serif",
@@ -500,7 +654,8 @@ function renderApp() {
         quoteTextColor: "#7a7265",
         hrColor: "#e8dfd0",
         fontSize: 16,
-      }
+      },
+      onLinkClick: (url: string) => navigateTo(url)
     });
     md.setPosition(0, detailY);
     page.add(md);
