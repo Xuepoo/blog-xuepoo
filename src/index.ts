@@ -170,7 +170,7 @@ const mathExtension = {
 };
 marked.use({ extensions: [mathExtension] });
 
-export class CustomMarkdown extends Markdown {
+class CustomMarkdown extends Markdown {
   protected renderToken(token: Token): Entity | null {
     if (token.type === 'math') {
       try {
