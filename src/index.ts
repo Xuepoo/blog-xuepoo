@@ -607,7 +607,7 @@ function renderApp() {
       const summaryText = new CustomMarkdown(post.summary || post.description || "", {
         maxWidth: contentWidth,
         theme: {
-          bodyFont: "15px Noto Serif SC, serif",
+          bodyFont: "Noto Serif SC, serif",
           textColor: "#7a7265",
           headingColor: "#332f29",
           codeColor: "#8c765c",
@@ -683,13 +683,13 @@ function renderApp() {
     detailY += pageMeta.height + 40;
 
     let rawMarkdown = payload.raw_content || "";
-    // Strip Zola TOML and YAML frontmatter
-    rawMarkdown = rawMarkdown.trimStart().replace(/^(?:\+\+\+|---)[\s\S]*?(?:\+\+\+|---)\n*/, "");
+    // Strip Zola TOML and YAML frontmatter (handle BOM and whitespace)
+    rawMarkdown = rawMarkdown.replace(/^\s*[\uFEFF]?(?:\+\+\+|---)[\s\S]*?(?:\+\+\+|---)\s*/, "");
     const md = new CustomMarkdown(rawMarkdown, {
       maxWidth: contentWidth,
       theme: {
-        bodyFont: isMobile ? "18px Noto Serif SC, serif" : "22px Noto Serif SC, serif",
-        codeFont: isMobile ? "14px monospace" : "18px monospace",
+        bodyFont: "Noto Serif SC, serif",
+        codeFont: "monospace",
         textColor: "#332f29",
         headingColor: "#332f29",
         codeColor: "#8c765c",
@@ -800,9 +800,11 @@ function renderApp() {
 async function loadViewCounts() {
   try {
     const res = await fetch("/api/views");
-    const data = await res.json();
-    for (const [slug, count] of Object.entries(data)) {
-      viewsMap.set(slug, count as number);
+    if (res.ok) {
+      const data = await res.json();
+      for (const [slug, count] of Object.entries(data)) {
+        viewsMap.set(slug, count as number);
+      }
     }
   } catch (e) {
     console.error("Failed to load view counts", e);
@@ -815,9 +817,11 @@ async function logCurrentPageView() {
     try {
       const url = `/api/views?slug=${encodeURIComponent(slug)}`;
       const res = await fetch(url, { method: "POST" });
-      const data = await res.json();
-      if (data && typeof data.views === "number") {
-        viewsMap.set(slug, data.views);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data.views === "number") {
+          viewsMap.set(slug, data.views);
+        }
       }
     } catch (e) {
       console.error("Failed to log view", e);
