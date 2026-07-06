@@ -1,10 +1,12 @@
 {% extends "base.html" %} {% block page_data %} { "type": "index", "posts": [ {% if paginator %} {%
-set pages = paginator.pages %} {% else %} {% set pages = section.pages %} {% endif %} {% for page in
-pages %} { "title": {{ page.title | json_encode | safe }}, "url": {{ page.permalink | json_encode |
-safe }}, "date": {{ page.date | date(format='%Y-%m-%d') | json_encode | safe }}, "slug": {{
-page.slug | safe | json_encode | safe }}, "description": {{ page.description | default(value="") |
-json_encode | safe }}, "summary": {{ page.summary | default(value="") | json_encode | safe }},
-"tags": {{ page.extra.tags | default(value=[]) | json_encode | safe }} }{% if not loop.last %},{%
-endif %} {% endfor %} ], "paginator": { "previous": {% if paginator and paginator.previous %}"{{
-paginator.previous }}"{% else %}null{% endif %}, "next": {% if paginator and paginator.next %}"{{
-paginator.next }}"{% else %}null{% endif %} } } {% endblock %}
+set pages = paginator.pages %} {% else %} {% set pages = section.pages %} {% endif %} {% set first =
+true %} {% for page in pages %} {% if page.slug != "search-json" and page.slug != "search" %} {% if
+not first %},{% endif %} {% set_global first = false %} { "title": {{ page.title | default(value="")
+| json_encode | safe }}, "url": {{ page.permalink | json_encode | safe }}, "date": {{ page.date |
+date(format='%Y-%m-%d') | json_encode | safe }}, "slug": {{ page.slug | safe | json_encode | safe
+}}, "description": {{ page.description | default(value="") | json_encode | safe }}, "summary": {{
+page.summary | default(value="") | json_encode | safe }}, "tags": {{ page.extra.tags |
+default(value=[]) | json_encode | safe }} } {% endif %} {% endfor %} ], "paginator": { "previous":
+{% if paginator and paginator.previous %}"{{ paginator.previous }}"{% else %}null{% endif %},
+"next": {% if paginator and paginator.next %}"{{ paginator.next }}"{% else %}null{% endif %} } } {%
+endblock %}
