@@ -885,7 +885,7 @@ function renderApp() {
   // Force a synchronous render immediately to prevent canvas flickering during window resize.
   // This ensures the canvas pixel buffer is refilled in the same event loop task after
   // Scene.ts clears it via canvas.width = newWidth.
-  currentScene.render(true);
+  currentScene.render((currentScene as any).renderer, 0, performance.now());
 }
 
 // ─── View Tracking ────────────────────────────────────────────────────────────
