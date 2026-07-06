@@ -36,6 +36,7 @@ let viewsMap = new Map<string, number>();
 const imageCache = new Map<string, { img: HTMLImageElement; aspectRatio: number }>();
 // Wheel handler attached to the canvas for scroll (Scene does not forward wheel events)
 let _canvasWheelHandler: ((e: WheelEvent) => void) | null = null;
+let currentMainScroll: Container | null = null;
 
 // HTML tags to RichText spans
 function parseHtmlToSpans(html: string): any[] {
@@ -525,6 +526,7 @@ function renderApp() {
   const originX = (width - contentWidth) / 2;
 
   const mainScroll = new Container();
+  currentMainScroll = mainScroll;
   currentScene.add(mainScroll);
 
   if (!_canvasWheelHandler) {
@@ -535,8 +537,10 @@ function renderApp() {
     document.documentElement.style.overflow = "auto";
 
     window.addEventListener("scroll", () => {
-      mainScroll.y = -window.scrollY;
-      currentScene?.markDirty();
+      if (currentMainScroll) {
+        currentMainScroll.y = -window.scrollY;
+        currentScene?.markDirty();
+      }
     });
   }
 
