@@ -851,9 +851,28 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   renderPage();
 
-  window.addEventListener("resize", () => { renderPage(); });
+  let lastWidth = window.innerWidth;
+  let resizeTimer: any;
+  window.addEventListener("resize", () => {
+    // On mobile, scrolling down hides the URL bar, triggering a resize (height change only).
+    // If we rebuild the whole page, it destroys and re-parses all Markdown, leaking memory
+    // and causing severe lag. We ONLY rebuild if the width changed!
+    if (window.innerWidth !== lastWidth) {
+      lastWidth = window.innerWidth;
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        renderPage();
+      }, 150);
+    } else {
+      currentScene?.markDirty();
+    }
+  });
 
   window.addEventListener("popstate", async () => {
+    // Clear image cache on navigation to prevent unbounded memory growth (400MB+)
+    if (typeof (imageCache as any).clear === 'function') {
+      imageCache.clear();
+    }
     await handleUrlRoute(window.location.pathname);
   });
 
