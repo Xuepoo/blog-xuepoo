@@ -1,6 +1,6 @@
 {% extends "base.html" %} {% block page_data %} { "type": "page", "title": {{ page.title |
 json_encode | safe }}, "date": "{{ page.date | date(format='%Y-%m-%d') }}", "slug": "{{ page.slug |
-safe }}", "word_count": {{ page.word_count }}, "tags": {{ page.extra.tags | default(value=[]) |
+safe }}", "word_count": {{ page.word_count }}, "tags": {{ page.taxonomies.tags | default(value=[]) |
 json_encode | safe }}, "raw_content": {{ load_data(path="content/" ~ page.relative_path,
 format="plain") | json_encode | safe }}, "content": {{ page.content | replace(from=page.permalink ~
 'static/assets/', to='/assets/') | json_encode | safe }}, "toc": [ {% for h1 in page.toc %} {
