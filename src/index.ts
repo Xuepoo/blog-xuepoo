@@ -42,6 +42,9 @@ import { marked, type Token } from "marked";
 import katex from "katex";
 
 class MathBlock extends Entity {
+  public isPointInside(_globalX: number, _globalY: number): boolean {
+    return false;
+  }
   private img: HTMLImageElement | null = null;
   private loaded = false;
 
@@ -95,6 +98,9 @@ class MathBlock extends Entity {
 }
 
 class BlogImage extends Entity {
+  public isPointInside(_globalX: number, _globalY: number): boolean {
+    return false;
+  }
   private img: HTMLImageElement | null = null;
   private loaded = false;
   private src: string;
@@ -157,14 +163,14 @@ class BlogImage extends Entity {
 function requestLayout(entity: any) {
   let curr = entity;
   while (curr) {
-    if (curr.content && typeof curr.content.layout === 'function') {
+    if (curr.content && typeof curr.content.layout === "function") {
       curr.content.layout();
       curr.width = curr.content.width;
       curr.height = curr.content.height;
-    } else if (typeof curr.layout === 'function') {
+    } else if (typeof curr.layout === "function") {
       curr.layout();
     }
-    if (typeof curr.onHeightChanged === 'function') {
+    if (typeof curr.onHeightChanged === "function") {
       curr.onHeightChanged();
     }
     curr = curr.parent;
@@ -172,37 +178,44 @@ function requestLayout(entity: any) {
 }
 
 const mathExtension = {
-  name: 'math',
-  level: 'block',
-  start(src: string) { return src.match(/\$\$/)?.index; },
+  name: "math",
+  level: "block",
+  start(src: string) {
+    return src.match(/\$\$/)?.index;
+  },
   tokenizer(src: string, tokens: any) {
     const match = /^\$\$([\s\S]+?)\$\$/.exec(src);
     if (match) {
       return {
-        type: 'math',
+        type: "math",
         raw: match[0],
-        text: match[1].trim(),
+        text: match[1]!.trim(),
       };
     }
   },
-  renderer(token: any) { return token.text; }
+  renderer(token: any) {
+    return token.text;
+  },
 };
 marked.use({ extensions: [mathExtension] });
 
 class CustomMarkdown extends Markdown {
-  protected renderToken(token: Token): Entity | null {
-    if (token.type === 'math') {
+  protected override renderToken(token: Token): Entity | null {
+    if (token.type === "math") {
       try {
-        const htmlContent = katex.renderToString((token as any).text, { displayMode: true, throwOnError: false });
+        const htmlContent = katex.renderToString((token as any).text, {
+          displayMode: true,
+          throwOnError: false,
+        });
         return new MathBlock(htmlContent, this.maxWidth);
       } catch (e) {
         console.error(e);
       }
     }
 
-    if (token.type === 'paragraph') {
+    if (token.type === "paragraph") {
       const pToken = token as any;
-      if (pToken.tokens && pToken.tokens.length === 1 && pToken.tokens[0].type === 'image') {
+      if (pToken.tokens && pToken.tokens.length === 1 && pToken.tokens[0].type === "image") {
         const imgToken = pToken.tokens[0];
         return new BlogImage(imgToken.href, imgToken.text, this.maxWidth);
       }
@@ -213,6 +226,9 @@ class CustomMarkdown extends Markdown {
 }
 
 class DividerLine extends Entity {
+  public isPointInside(_globalX: number, _globalY: number): boolean {
+    return false;
+  }
   private color: string;
   constructor(width: number, color: string = "#e8dfd0") {
     super();
@@ -229,6 +245,9 @@ class DividerLine extends Entity {
 }
 
 class Container extends Entity {
+  public isPointInside(_globalX: number, _globalY: number): boolean {
+    return false;
+  }
   public render(_r: any): void {}
 }
 
@@ -237,6 +256,11 @@ class Container extends Entity {
 // ─── Post Card with Hover Highlight (no y-shift to avoid layout overlap) ──────
 
 class AnimatedPostItem extends Entity {
+  public isPointInside(globalX: number, globalY: number): boolean {
+    const local = this.worldToLocal(globalX, globalY);
+    if (!local) return false;
+    return local.x >= 0 && local.x <= this.width && local.y >= 0 && local.y <= this.height;
+  }
   private hovered = false;
 
   constructor(width: number) {
@@ -247,7 +271,7 @@ class AnimatedPostItem extends Entity {
 
     // Only change the background on hover — no y movement which would cause
     // visual overlap with adjacent layout items.
-    this.on("pointerenter", () => {
+    this.on("hover", () => {
       this.hovered = true;
       currentScene?.markDirty();
     });
@@ -271,6 +295,9 @@ class AnimatedPostItem extends Entity {
 // ─── Reading Progress Bar (Easing.easeOutCubic) ───────────────────────────────
 
 class ReadingProgressBar extends Entity {
+  public isPointInside(_globalX: number, _globalY: number): boolean {
+    return false;
+  }
   private scrollRef: Container;
   private displayProgress = 0;
 
@@ -281,9 +308,9 @@ class ReadingProgressBar extends Entity {
     this.height = 3;
   }
 
-  public update(dt: number, time: number): void {
+  public override update(dt: number, time: number): void {
     super.update(dt, time);
-    const scrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+    const scrollY = typeof window !== "undefined" ? window.scrollY : 0;
     const maxScroll = Math.max(1, this.scrollRef.height - window.innerHeight);
     const target = Math.min(1, Math.max(0, scrollY / maxScroll));
 
@@ -314,6 +341,9 @@ class ReadingProgressBar extends Entity {
 // ─── Page Container with Fade-in Transition (opacity only, no y-shift) ────────
 
 class PageContainer extends Entity {
+  public isPointInside(_globalX: number, _globalY: number): boolean {
+    return false;
+  }
   constructor() {
     super();
     // Use opacity-only fade: changing y would disturb the layout for children.
@@ -334,6 +364,21 @@ class PageContainer extends Entity {
 // ─── Router & Navigation ─────────────────────────────────────────────────────
 
 async function navigateTo(url: string) {
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.origin !== window.location.origin) {
+        window.location.href = url;
+        return;
+      }
+      const targetUrl = parsed.pathname + parsed.search + parsed.hash;
+      window.history.pushState({}, "", targetUrl);
+      await handleUrlRoute(targetUrl);
+      return;
+    } catch (e) {
+      console.warn("Failed to parse URL in navigateTo:", e);
+    }
+  }
   window.history.pushState({}, "", url);
   await handleUrlRoute(url);
 }
@@ -360,20 +405,24 @@ async function handleUrlRoute(url: string) {
 
 async function initSearchDatabase() {
   try {
-    const response = await fetch("/search.json/");
+    const response = await fetch("/search.json");
     if (response.ok) {
-      const rawText = await response.text();
-      if (rawText.trim().startsWith("<")) {
-        console.warn("Search database not found (returned HTML).");
-        return;
-      }
-      try {
-        searchDatabase = JSON.parse(decrypt(rawText));
-        if (typeof window !== "undefined") {
-          (window as any).searchDatabase = searchDatabase;
+      const htmlText = await response.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, "text/html");
+      const searchElement = doc.getElementById("search-data");
+      if (searchElement) {
+        const rawText = searchElement.textContent || "";
+        try {
+          searchDatabase = JSON.parse(decrypt(rawText.trim()));
+          if (typeof window !== "undefined") {
+            (window as any).searchDatabase = searchDatabase;
+          }
+        } catch (parseError) {
+          console.warn("Failed to parse decrypted search database JSON:", parseError);
         }
-      } catch (parseError) {
-        console.warn("Failed to parse search database JSON:", parseError);
+      } else {
+        console.warn("Search-data script element not found in HTML response");
       }
     }
   } catch (e) {
@@ -392,6 +441,15 @@ function renderApp() {
     const kids = [...root.children];
     for (const kid of kids) {
       currentScene.remove(kid);
+      // Recursively destroy entity subtree to aggressively free memory (RichText caches, etc.)
+      const destroySubtree = (node: any) => {
+        if (node.children) {
+          const children = [...node.children];
+          for (const c of children) destroySubtree(c);
+        }
+        if (typeof node.destroy === "function") node.destroy();
+      };
+      destroySubtree(kid);
     }
   }
 
@@ -406,11 +464,11 @@ function renderApp() {
 
   // Use a fast tween instead of a spring to prevent elastic bouncing / overshoot,
   // while still smoothing out rigid mouse wheel steps.
-  mainScroll.setTransition({ y: { type: "tween", duration: 120, easing: "easeOutCubic" } });
+  mainScroll.setTransition({ y: { duration: 120, easing: "easeOutCubic" } });
 
   // Keep the VectoJS render loop alive while the scrolling spring settles
   const _origUpdate = mainScroll.update.bind(mainScroll);
-  mainScroll.update = function(dt: number, time: number) {
+  mainScroll.update = function (dt: number, time: number) {
     _origUpdate(dt, time);
     if (this.hasPendingAnimations()) {
       currentScene?.markDirty();
@@ -454,7 +512,7 @@ function renderApp() {
       font: "600 24px Noto Sans SC, sans-serif",
       color: "#332f29",
       onLinkClick: () => navigateTo("/"),
-    }
+    },
   );
   headerContainer.add(titleText);
 
@@ -475,18 +533,23 @@ function renderApp() {
         return;
       }
 
-      const matches = searchDatabase.filter(post => {
-        const title = (post.title || "").toLowerCase();
-        const desc = (post.description || "").toLowerCase();
-        const content = (post.content || "").toLowerCase();
+      const matches = searchDatabase
+        .filter((post) => {
+          const title = (post.title || "").toLowerCase();
+          const desc = (post.description || "").toLowerCase();
+          const content = (post.content || "").toLowerCase();
 
-        if (query.startsWith("#")) {
-          const tagQuery = query.slice(1);
-          return post.tags && post.tags.some((tag: string) => tag.toLowerCase().includes(tagQuery));
-        }
-        const inTags = post.tags && post.tags.some((tag: string) => tag.toLowerCase().includes(query));
-        return inTags || title.includes(query) || desc.includes(query) || content.includes(query);
-      }).slice(0, 5);
+          if (query.startsWith("#")) {
+            const tagQuery = query.slice(1);
+            return (
+              post.tags && post.tags.some((tag: string) => tag.toLowerCase().includes(tagQuery))
+            );
+          }
+          const inTags =
+            post.tags && post.tags.some((tag: string) => tag.toLowerCase().includes(query));
+          return inTags || title.includes(query) || desc.includes(query) || content.includes(query);
+        })
+        .slice(0, 5);
 
       currentSearchMatches = matches;
 
@@ -502,10 +565,14 @@ function renderApp() {
             bg: "#ede4d3",
             border: "#e8dfd0",
             radius: 4,
+            label: `文章: ${match.title}`,
           });
           card.setPosition(0, dy);
-          card.interactive = true;
-          card.on("pointerup", () => { navigateTo(match.url); });
+          const handleNavigation = () => {
+            navigateTo(match.url);
+          };
+          card.on("click", handleNavigation);
+          card.on("pointerup", handleNavigation);
 
           const cardTitle = new Text(match.title, {
             font: "12px Noto Sans SC, sans-serif",
@@ -528,6 +595,13 @@ function renderApp() {
         headerContainer.add(searchDropdown);
       }
       currentScene?.markDirty();
+    },
+  });
+  searchInput.on("keydown", (e: any) => {
+    if (e.nativeEvent?.key === "Enter") {
+      if (currentSearchMatches && currentSearchMatches.length > 0) {
+        navigateTo(currentSearchMatches[0].url);
+      }
     }
   });
   if (isMobile) {
@@ -583,7 +657,7 @@ function renderApp() {
           font: "600 20px Noto Serif SC, serif",
           color: "#332f29",
           onLinkClick: () => navigateTo(post.url),
-        }
+        },
       );
       postItem.add(postTitle);
 
@@ -617,7 +691,7 @@ function renderApp() {
           hrColor: "#e8dfd0",
           fontSize: 15,
         },
-        onLinkClick: (url: string) => navigateTo(url)
+        onLinkClick: (url: string) => navigateTo(url),
       });
       summaryText.setPosition(0, itemY);
       postItem.add(summaryText);
@@ -629,7 +703,7 @@ function renderApp() {
         {
           font: "14px Noto Sans SC, sans-serif",
           onLinkClick: () => navigateTo(post.url),
-        }
+        },
       );
       readMore.setPosition(0, itemY);
       postItem.add(readMore);
@@ -646,21 +720,22 @@ function renderApp() {
     }
 
     page.height = listY;
-
   } else if (payload.type === "page") {
     // ── Post Detail ──────────────────────────────────────────────────────────
     let detailY = 0;
 
     const pageTitle = new RichText(
-      [{
-        text: payload.title || "Untitled",
-        style: { fontSize: isMobile ? 32 : 44, lineHeight: 1.4, bold: true }
-      }],
+      [
+        {
+          text: payload.title || "Untitled",
+          style: { fontSize: isMobile ? 32 : 44, bold: true },
+        },
+      ],
       {
         font: `${isMobile ? 32 : 44}px STKaiti, KaiTi, serif`,
         color: "#332f29",
         maxWidth: contentWidth,
-      }
+      },
     );
     pageTitle.setPosition(0, detailY);
     page.add(pageTitle);
@@ -699,7 +774,7 @@ function renderApp() {
         hrColor: "#e8dfd0",
         fontSize: isMobile ? 18 : 22,
       },
-      onLinkClick: (url: string) => navigateTo(url)
+      onLinkClick: (url: string) => navigateTo(url),
     });
     md.setPosition(0, detailY);
     page.add(md);
@@ -713,7 +788,7 @@ function renderApp() {
       const ear = payload.navigation.earlier;
       const prev = new RichText(
         [{ text: `← ${ear.title}`, style: { color: "#8c765c", href: ear.url } }],
-        { font: "14px Noto Sans SC, sans-serif", onLinkClick: () => navigateTo(ear.url) }
+        { font: "14px Noto Sans SC, sans-serif", onLinkClick: () => navigateTo(ear.url) },
       );
       prev.setPosition(0, 0);
       navEntity.add(prev);
@@ -723,7 +798,7 @@ function renderApp() {
       const lat = payload.navigation.later;
       const nextText = new RichText(
         [{ text: `${lat.title} →`, style: { color: "#8c765c", href: lat.url } }],
-        { font: "14px Noto Sans SC, sans-serif", onLinkClick: () => navigateTo(lat.url) }
+        { font: "14px Noto Sans SC, sans-serif", onLinkClick: () => navigateTo(lat.url) },
       );
       nextText.setPosition(contentWidth - nextText.width, 0);
       navEntity.add(nextText);
@@ -733,10 +808,10 @@ function renderApp() {
     detailY += 40;
 
     detailY += 20;
-    const backBtn = new RichText(
-      [{ text: "← 返回列表", style: { color: "#8c765c", href: "/" } }],
-      { font: "14px Noto Sans SC, sans-serif", onLinkClick: () => navigateTo("/") }
-    );
+    const backBtn = new RichText([{ text: "← 返回列表", style: { color: "#8c765c", href: "/" } }], {
+      font: "14px Noto Sans SC, sans-serif",
+      onLinkClick: () => navigateTo("/"),
+    });
     backBtn.setPosition(0, detailY);
     page.add(backBtn);
 
@@ -758,7 +833,7 @@ function renderApp() {
         page.height = footerY + 80;
       }
 
-      if (typeof document !== 'undefined') {
+      if (typeof document !== "undefined") {
         document.body.style.height = `${page.height}px`;
         mainScroll.height = page.height;
       }
@@ -783,7 +858,7 @@ function renderApp() {
   page.height = footerY + 80;
 
   // IMPORTANT: Set the document body height so native scrolling works
-  if (typeof document !== 'undefined') {
+  if (typeof document !== "undefined") {
     document.body.style.height = `${page.height}px`;
     mainScroll.height = page.height;
   }
@@ -860,17 +935,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderPage();
 
   let lastWidth = window.innerWidth;
-  let resizeTimer: any;
+  let resizeAnimationFrameId: number | null = null;
   window.addEventListener("resize", () => {
     // On mobile, scrolling down hides the URL bar, triggering a resize (height change only).
     // If we rebuild the whole page, it destroys and re-parses all Markdown, leaking memory
     // and causing severe lag. We ONLY rebuild if the width changed!
     if (window.innerWidth !== lastWidth) {
       lastWidth = window.innerWidth;
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        renderPage();
-      }, 150);
+      if (resizeAnimationFrameId === null) {
+        resizeAnimationFrameId = requestAnimationFrame(() => {
+          resizeAnimationFrameId = null;
+          renderPage();
+        });
+      }
     } else {
       currentScene?.markDirty();
     }
@@ -878,14 +955,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   window.addEventListener("popstate", async () => {
     // Clear image cache on navigation to prevent unbounded memory growth (400MB+)
-    if (typeof (imageCache as any).clear === 'function') {
+    if (typeof (imageCache as any).clear === "function") {
       imageCache.clear();
     }
     await handleUrlRoute(window.location.pathname);
   });
 
   if (typeof document !== "undefined" && (document as any).fonts) {
-    (document as any).fonts.ready.then(() => { renderPage(); });
+    (document as any).fonts.ready.then(() => {
+      renderPage();
+    });
   }
 });
 

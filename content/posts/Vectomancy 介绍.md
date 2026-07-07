@@ -60,7 +60,7 @@ Vectomancy 支持三种模式，分别如下：
 
 ## Vectomancy Website 介绍
 
-以上我说的都是本身这个 vectomancy 程序，这个只是一个 CLI 程序，只是在终端可以进行操作，但是对于大多数人来说就用不到终端，而且终端上面的体验并不是很舒服，所以我就开发了对应的网页端，我最开始是想的从好几个 GUI 形式进行开发的，但是最优解是静态网页 + WASM，前端我是使用的 Zola 构建的静态网页，然后后端我是把我的 CLI 程序给编译成了 WASM（这个编译后的大小很小，只有 2MB 左右），然后用户只需要访问我的这个域名 [https://vectomancy.xuepoo.xyz](https//vectomancy.xuepoo.xyz) 既可以直接使用了。
+以上我说的都是本身这个 vectomancy 程序，这个只是一个 CLI 程序，只是在终端可以进行操作，但是对于大多数人来说就用不到终端，而且终端上面的体验并不是很舒服，所以我就开发了对应的网页端，我最开始是想的从好几个 GUI 形式进行开发的，但是最优解是静态网页 + WASM，前端我是使用的 Zola 构建的静态网页，然后后端我是把我的 CLI 程序给编译成了 WASM（这个编译后的大小很小，只有 2MB 左右），然后用户只需要访问我的这个域名 [https://vectomancy.xuepoo.xyz](https://vectomancy.xuepoo.xyz) 既可以直接使用了。
 
 ![网页端首页](https://cdn.xuepoo.xyz/blog/posts/Vectomancy%20%E4%BB%8B%E7%BB%8D/Pasted%20image%2020260623194323.webp)
 
