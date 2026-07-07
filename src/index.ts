@@ -363,11 +363,21 @@ class PageContainer extends Entity {
 
 // ─── Router & Navigation ─────────────────────────────────────────────────────
 
+function isSameBlogOrigin(parsedUrl: URL): boolean {
+  const host = parsedUrl.hostname;
+  const currentHost = window.location.hostname;
+  if (host === currentHost) return true;
+  const blogDomains = ["blog.xuepoo.xyz", "localhost", "127.0.0.1"];
+  const isTargetBlog = blogDomains.includes(host) || host.endsWith("xuepoo-blog.pages.dev");
+  const isCurrentBlog = blogDomains.includes(currentHost) || currentHost.endsWith("xuepoo-blog.pages.dev");
+  return isTargetBlog && isCurrentBlog;
+}
+
 async function navigateTo(url: string) {
   if (url.startsWith("http://") || url.startsWith("https://")) {
     try {
       const parsed = new URL(url);
-      if (parsed.origin !== window.location.origin) {
+      if (!isSameBlogOrigin(parsed)) {
         window.location.href = url;
         return;
       }
