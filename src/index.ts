@@ -920,6 +920,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   const canvas = document.getElementById("vecto-canvas") as HTMLCanvasElement;
   if (!canvas) return;
 
+  // Enable mobile touch scrolling on the fixed canvas overlay
+  let touchStartY = 0;
+  canvas.addEventListener("touchstart", (e: TouchEvent) => {
+    if (e.touches && e.touches[0]) {
+      touchStartY = e.touches[0].clientY;
+    }
+  }, { passive: true });
+
+  canvas.addEventListener("touchmove", (e: TouchEvent) => {
+    if (e.touches && e.touches[0]) {
+      const touchY = e.touches[0].clientY;
+      const deltaY = touchStartY - touchY;
+      touchStartY = touchY;
+      window.scrollBy(0, deltaY);
+    }
+  }, { passive: true });
+
   currentScene = new Scene(canvas, { maxFPS: 60 });
   currentScene.renderMode = "onDemand";
   currentScene.start();
