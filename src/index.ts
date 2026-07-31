@@ -1,11 +1,12 @@
-import { Scene, Entity } from "@vectojs/core";
-import { ScrollView, Text, RichText, Input, Card, Markdown } from "@vectojs/ui";
+import { Scene, Entity } from '@vectojs/core';
+import { Text, RichText, Input, Card } from '@vectojs/ui';
+import { Markdown } from '@vectojs/markdown';
 
 const key = 42;
 
 // Decrypt function matching obfuscate.ts using byte-level TextDecoder
 function decrypt(obfuscated: string): string {
-  if (obfuscated.startsWith("e:")) {
+  if (obfuscated.startsWith('e:')) {
     const rawData = obfuscated.slice(2);
     const binary = atob(rawData);
     const bytes = new Uint8Array(binary.length);
@@ -21,7 +22,7 @@ function parsePageData(raw: string) {
   try {
     return JSON.parse(decrypt(raw.trim()));
   } catch (e) {
-    console.error("Failed to parse page data", e);
+    console.error('Failed to parse page data', e);
     return null;
   }
 }
@@ -38,8 +39,8 @@ const imageCache = new Map<string, { img: HTMLImageElement; aspectRatio: number 
 let _canvasWheelHandler: ((e: WheelEvent) => void) | null = null;
 let currentMainScroll: Container | null = null;
 
-import { marked, type Token } from "marked";
-import katex from "katex";
+import { marked, type Token } from 'marked';
+import katex from 'katex';
 
 class MathBlock extends Entity {
   public isPointInside(_globalX: number, _globalY: number): boolean {
@@ -53,11 +54,11 @@ class MathBlock extends Entity {
     this.width = width;
     this.height = 60;
 
-    const container = document.createElement("div");
-    container.style.position = "absolute";
-    container.style.visibility = "hidden";
-    container.style.color = "#332f29";
-    container.style.fontFamily = "Noto Serif SC, serif";
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.visibility = 'hidden';
+    container.style.color = '#332f29';
+    container.style.fontFamily = 'Noto Serif SC, serif';
     container.style.width = `${width}px`;
     container.innerHTML = htmlContent;
     document.body.appendChild(container);
@@ -87,7 +88,7 @@ class MathBlock extends Entity {
       this.height = h + 20;
       currentScene?.markDirty();
     };
-    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.trim());
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg.trim());
   }
 
   public render(r: any): void {
@@ -121,7 +122,7 @@ class BlogImage extends Entity {
       this.height = Math.round(this.maxWidth * cached.aspectRatio);
     } else {
       this.height = 300;
-      if (typeof window !== "undefined") {
+      if (typeof window !== 'undefined') {
         const img = new window.Image();
         img.onload = () => {
           this.loaded = true;
@@ -154,7 +155,7 @@ class BlogImage extends Entity {
       r.save();
       r.beginPath();
       r.roundRect(0, 0, this.width, this.height, 6);
-      r.fill("#ede4d3");
+      r.fill('#ede4d3');
       r.restore();
     }
   }
@@ -163,14 +164,14 @@ class BlogImage extends Entity {
 function requestLayout(entity: any) {
   let curr = entity;
   while (curr) {
-    if (curr.content && typeof curr.content.layout === "function") {
+    if (curr.content && typeof curr.content.layout === 'function') {
       curr.content.layout();
       curr.width = curr.content.width;
       curr.height = curr.content.height;
-    } else if (typeof curr.layout === "function") {
+    } else if (typeof curr.layout === 'function') {
       curr.layout();
     }
-    if (typeof curr.onHeightChanged === "function") {
+    if (typeof curr.onHeightChanged === 'function') {
       curr.onHeightChanged();
     }
     curr = curr.parent;
@@ -178,16 +179,16 @@ function requestLayout(entity: any) {
 }
 
 const mathExtension = {
-  name: "math",
-  level: "block",
+  name: 'math',
+  level: 'block',
   start(src: string) {
     return src.match(/\$\$/)?.index;
   },
-  tokenizer(src: string, tokens: any) {
+  tokenizer(src: string, _tokens: any) {
     const match = /^\$\$([\s\S]+?)\$\$/.exec(src);
     if (match) {
       return {
-        type: "math",
+        type: 'math',
         raw: match[0],
         text: match[1]!.trim(),
       };
@@ -201,7 +202,7 @@ marked.use({ extensions: [mathExtension] });
 
 class CustomMarkdown extends Markdown {
   protected override renderToken(token: Token): Entity | null {
-    if (token.type === "math") {
+    if (token.type === 'math') {
       try {
         const htmlContent = katex.renderToString((token as any).text, {
           displayMode: true,
@@ -213,9 +214,9 @@ class CustomMarkdown extends Markdown {
       }
     }
 
-    if (token.type === "paragraph") {
+    if (token.type === 'paragraph') {
       const pToken = token as any;
-      if (pToken.tokens && pToken.tokens.length === 1 && pToken.tokens[0].type === "image") {
+      if (pToken.tokens && pToken.tokens.length === 1 && pToken.tokens[0].type === 'image') {
         const imgToken = pToken.tokens[0];
         return new BlogImage(imgToken.href, imgToken.text, this.maxWidth);
       }
@@ -230,7 +231,7 @@ class DividerLine extends Entity {
     return false;
   }
   private color: string;
-  constructor(width: number, color: string = "#e8dfd0") {
+  constructor(width: number, color: string = '#e8dfd0') {
     super();
     this.width = width;
     this.height = 1;
@@ -271,11 +272,11 @@ class AnimatedPostItem extends Entity {
 
     // Only change the background on hover — no y movement which would cause
     // visual overlap with adjacent layout items.
-    this.on("hover", () => {
+    this.on('hover', () => {
       this.hovered = true;
       currentScene?.markDirty();
     });
-    this.on("pointerleave", () => {
+    this.on('pointerleave', () => {
       this.hovered = false;
       currentScene?.markDirty();
     });
@@ -286,7 +287,7 @@ class AnimatedPostItem extends Entity {
       r.save();
       r.beginPath();
       r.roundRect(-12, -8, this.width + 24, this.height + 16, 8);
-      r.fill("rgba(140, 118, 92, 0.07)");
+      r.fill('rgba(140, 118, 92, 0.07)');
       r.restore();
     }
   }
@@ -310,7 +311,7 @@ class ReadingProgressBar extends Entity {
 
   public override update(dt: number, time: number): void {
     super.update(dt, time);
-    const scrollY = typeof window !== "undefined" ? window.scrollY : 0;
+    const scrollY = typeof window !== 'undefined' ? window.scrollY : 0;
     const maxScroll = Math.max(1, this.scrollRef.height - window.innerHeight);
     const target = Math.min(1, Math.max(0, scrollY / maxScroll));
 
@@ -329,11 +330,11 @@ class ReadingProgressBar extends Entity {
     r.save();
     r.beginPath();
     r.roundRect(0, 0, this.width, this.height, 0);
-    r.fill("rgba(140, 118, 92, 0.12)");
+    r.fill('rgba(140, 118, 92, 0.12)');
 
     r.beginPath();
     r.roundRect(0, 0, this.width * this.displayProgress, this.height, 0);
-    r.fill("#8c765c");
+    r.fill('#8c765c');
     r.restore();
   }
 }
@@ -349,7 +350,7 @@ class PageContainer extends Entity {
     // Use opacity-only fade: changing y would disturb the layout for children.
     this.opacity = 0;
     this.setTransition({
-      opacity: { duration: 340, easing: "easeOutCubic" },
+      opacity: { duration: 340, easing: 'easeOutCubic' },
     });
     // Fire after the current sync task so the entity is attached to the tree
     Promise.resolve().then(() => {
@@ -367,14 +368,15 @@ function isSameBlogOrigin(parsedUrl: URL): boolean {
   const host = parsedUrl.hostname;
   const currentHost = window.location.hostname;
   if (host === currentHost) return true;
-  const blogDomains = ["blog.xuepoo.xyz", "localhost", "127.0.0.1"];
-  const isTargetBlog = blogDomains.includes(host) || host.endsWith("xuepoo-blog.pages.dev");
-  const isCurrentBlog = blogDomains.includes(currentHost) || currentHost.endsWith("xuepoo-blog.pages.dev");
+  const blogDomains = ['blog.xuepoo.xyz', 'localhost', '127.0.0.1'];
+  const isTargetBlog = blogDomains.includes(host) || host.endsWith('xuepoo-blog.pages.dev');
+  const isCurrentBlog =
+    blogDomains.includes(currentHost) || currentHost.endsWith('xuepoo-blog.pages.dev');
   return isTargetBlog && isCurrentBlog;
 }
 
 async function navigateTo(url: string) {
-  if (url.startsWith("http://") || url.startsWith("https://")) {
+  if (url.startsWith('http://') || url.startsWith('https://')) {
     try {
       const parsed = new URL(url);
       if (!isSameBlogOrigin(parsed)) {
@@ -382,14 +384,14 @@ async function navigateTo(url: string) {
         return;
       }
       const targetUrl = parsed.pathname + parsed.search + parsed.hash;
-      window.history.pushState({}, "", targetUrl);
+      window.history.pushState({}, '', targetUrl);
       await handleUrlRoute(targetUrl);
       return;
     } catch (e) {
-      console.warn("Failed to parse URL in navigateTo:", e);
+      console.warn('Failed to parse URL in navigateTo:', e);
     }
   }
-  window.history.pushState({}, "", url);
+  window.history.pushState({}, '', url);
   await handleUrlRoute(url);
 }
 
@@ -398,45 +400,45 @@ async function handleUrlRoute(url: string) {
     const res = await fetch(url);
     const html = await res.text();
     const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
-    const dataElement = doc.getElementById("page-data");
+    const doc = parser.parseFromString(html, 'text/html');
+    const dataElement = doc.getElementById('page-data');
     if (dataElement) {
-      const raw = dataElement.textContent || "";
+      const raw = dataElement.textContent || '';
       currentPageData = parsePageData(raw);
       if (currentPageData && currentScene) {
         renderApp();
       }
     }
   } catch (e) {
-    console.error("SPA Navigation failed, reloading page...", e);
+    console.error('SPA Navigation failed, reloading page...', e);
     window.location.href = url;
   }
 }
 
 async function initSearchDatabase() {
   try {
-    const response = await fetch("/search.json");
+    const response = await fetch('/search.json');
     if (response.ok) {
       const htmlText = await response.text();
       const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlText, "text/html");
-      const searchElement = doc.getElementById("search-data");
+      const doc = parser.parseFromString(htmlText, 'text/html');
+      const searchElement = doc.getElementById('search-data');
       if (searchElement) {
-        const rawText = searchElement.textContent || "";
+        const rawText = searchElement.textContent || '';
         try {
           searchDatabase = JSON.parse(decrypt(rawText.trim()));
-          if (typeof window !== "undefined") {
+          if (typeof window !== 'undefined') {
             (window as any).searchDatabase = searchDatabase;
           }
         } catch (parseError) {
-          console.warn("Failed to parse decrypted search database JSON:", parseError);
+          console.warn('Failed to parse decrypted search database JSON:', parseError);
         }
       } else {
-        console.warn("Search-data script element not found in HTML response");
+        console.warn('Search-data script element not found in HTML response');
       }
     }
   } catch (e) {
-    console.warn("Failed to fetch search database", e);
+    console.warn('Failed to fetch search database', e);
   }
 }
 
@@ -457,14 +459,13 @@ function renderApp() {
           const children = [...node.children];
           for (const c of children) destroySubtree(c);
         }
-        if (typeof node.destroy === "function") node.destroy();
+        if (typeof node.destroy === 'function') node.destroy();
       };
       destroySubtree(kid);
     }
   }
 
   const width = window.innerWidth;
-  const height = window.innerHeight;
   const contentWidth = Math.min(920, width - 40);
   const isMobile = contentWidth < 600;
   const originX = (width - contentWidth) / 2;
@@ -474,7 +475,7 @@ function renderApp() {
 
   // Use a fast tween instead of a spring to prevent elastic bouncing / overshoot,
   // while still smoothing out rigid mouse wheel steps.
-  mainScroll.setTransition({ y: { duration: 120, easing: "easeOutCubic" } });
+  mainScroll.setTransition({ y: { duration: 120, easing: 'easeOutCubic' } });
 
   // Keep the VectoJS render loop alive while the scrolling spring settles
   const _origUpdate = mainScroll.update.bind(mainScroll);
@@ -488,13 +489,13 @@ function renderApp() {
   currentScene.add(mainScroll);
 
   if (!_canvasWheelHandler) {
-    _canvasWheelHandler = (e: Event) => {}; // No-op, just to satisfy the type
+    _canvasWheelHandler = (_e: Event) => {}; // No-op, just to satisfy the type
 
     // Enable native scrolling on body
-    document.body.style.overflow = "auto";
-    document.documentElement.style.overflow = "auto";
+    document.body.style.overflow = 'auto';
+    document.documentElement.style.overflow = 'auto';
 
-    window.addEventListener("scroll", () => {
+    window.addEventListener('scroll', () => {
       if (currentMainScroll) {
         currentMainScroll.y = -window.scrollY;
         currentScene?.markDirty();
@@ -505,7 +506,7 @@ function renderApp() {
   const progressBar = new ReadingProgressBar(mainScroll, width);
   currentScene.add(progressBar);
 
-  if (typeof window !== "undefined") {
+  if (typeof window !== 'undefined') {
     (window as any).currentScene = currentScene;
     (window as any).mainScroll = mainScroll;
   }
@@ -517,11 +518,11 @@ function renderApp() {
   headerContainer.setPosition(originX, currentY);
 
   const titleText = new RichText(
-    [{ text: currentPageData.config.title, style: { bold: true, href: "/" } }],
+    [{ text: currentPageData.config.title, style: { bold: true, href: '/' } }],
     {
-      font: "600 24px Noto Sans SC, sans-serif",
-      color: "#332f29",
-      onLinkClick: () => navigateTo("/"),
+      font: '600 24px Noto Sans SC, sans-serif',
+      color: '#332f29',
+      onLinkClick: () => navigateTo('/'),
     },
   );
   headerContainer.add(titleText);
@@ -529,8 +530,8 @@ function renderApp() {
   const searchInput = new Input({
     width: 150,
     height: 32,
-    placeholder: "搜索文章...",
-    font: "14px Noto Sans SC, sans-serif",
+    placeholder: '搜索文章...',
+    font: '14px Noto Sans SC, sans-serif',
     onChange: (val: string) => {
       const query = val.trim().toLowerCase();
       if (searchDropdown) {
@@ -545,11 +546,11 @@ function renderApp() {
 
       const matches = searchDatabase
         .filter((post) => {
-          const title = (post.title || "").toLowerCase();
-          const desc = (post.description || "").toLowerCase();
-          const content = (post.content || "").toLowerCase();
+          const title = (post.title || '').toLowerCase();
+          const desc = (post.description || '').toLowerCase();
+          const content = (post.content || '').toLowerCase();
 
-          if (query.startsWith("#")) {
+          if (query.startsWith('#')) {
             const tagQuery = query.slice(1);
             return (
               post.tags && post.tags.some((tag: string) => tag.toLowerCase().includes(tagQuery))
@@ -572,8 +573,8 @@ function renderApp() {
           const card = new Card({
             width: 250,
             height: 50,
-            bg: "#ede4d3",
-            border: "#e8dfd0",
+            bg: '#ede4d3',
+            border: '#e8dfd0',
             radius: 4,
             label: `文章: ${match.title}`,
           });
@@ -581,20 +582,20 @@ function renderApp() {
           const handleNavigation = () => {
             navigateTo(match.url);
           };
-          card.on("click", handleNavigation);
-          card.on("pointerup", handleNavigation);
+          card.on('click', handleNavigation);
+          card.on('pointerup', handleNavigation);
 
           const cardTitle = new Text(match.title, {
-            font: "12px Noto Sans SC, sans-serif",
-            color: "#332f29",
+            font: '12px Noto Sans SC, sans-serif',
+            color: '#332f29',
             maxWidth: 230,
           });
           cardTitle.setPosition(10, 8);
           card.add(cardTitle);
 
           const cardDate = new Text(match.date, {
-            font: "10px Noto Sans SC, sans-serif",
-            color: "#7a7265",
+            font: '10px Noto Sans SC, sans-serif',
+            color: '#7a7265',
           });
           cardDate.setPosition(10, 30);
           card.add(cardDate);
@@ -607,8 +608,8 @@ function renderApp() {
       currentScene?.markDirty();
     },
   });
-  searchInput.on("keydown", (e: any) => {
-    if (e.nativeEvent?.key === "Enter") {
+  searchInput.on('keydown', (e: any) => {
+    if (e.nativeEvent?.key === 'Enter') {
       if (currentSearchMatches && currentSearchMatches.length > 0) {
         navigateTo(currentSearchMatches[0].url);
       }
@@ -641,14 +642,14 @@ function renderApp() {
 
   const payload = currentPageData.data;
 
-  if (payload.type === "index" || payload.type === "taxonomy_single") {
+  if (payload.type === 'index' || payload.type === 'taxonomy_single') {
     // ── Post List ────────────────────────────────────────────────────────────
     let listY = 0;
 
-    if (payload.type === "taxonomy_single") {
+    if (payload.type === 'taxonomy_single') {
       const heading = new Text(`关于 "${payload.term}" 的所有文章`, {
-        font: "600 20px Noto Sans SC, sans-serif",
-        color: "#332f29",
+        font: '600 20px Noto Sans SC, sans-serif',
+        color: '#332f29',
       });
       heading.setPosition(0, listY);
       page.add(heading);
@@ -664,8 +665,8 @@ function renderApp() {
       const postTitle = new RichText(
         [{ text: post.title, style: { bold: true, href: post.url } }],
         {
-          font: "600 20px Noto Serif SC, serif",
-          color: "#332f29",
+          font: '600 20px Noto Serif SC, serif',
+          color: '#332f29',
           onLinkClick: () => navigateTo(post.url),
         },
       );
@@ -676,29 +677,29 @@ function renderApp() {
       const views = viewsMap.get(post.slug) ?? 0;
       let metaText = `${post.date} · 阅读: ${views} 次`;
       if (post.tags && post.tags.length > 0) {
-        metaText += ` · 标签: ${post.tags.map((t: string) => `#${t}`).join(" ")}`;
+        metaText += ` · 标签: ${post.tags.map((t: string) => `#${t}`).join(' ')}`;
       }
 
       const postMeta = new Text(metaText, {
-        font: "13px Noto Sans SC, sans-serif",
-        color: "#7a7265",
+        font: '13px Noto Sans SC, sans-serif',
+        color: '#7a7265',
       });
       postMeta.setPosition(0, itemY);
       postItem.add(postMeta);
 
       itemY += 24;
 
-      const summaryText = new CustomMarkdown(post.summary || post.description || "", {
+      const summaryText = new CustomMarkdown(post.summary || post.description || '', {
         maxWidth: contentWidth,
         theme: {
-          bodyFont: "Noto Serif SC, serif",
-          textColor: "#7a7265",
-          headingColor: "#332f29",
-          codeColor: "#8c765c",
-          codeBgColor: "#ede4d3",
-          quoteBorderColor: "#8c765c",
-          quoteTextColor: "#7a7265",
-          hrColor: "#e8dfd0",
+          bodyFont: 'Noto Serif SC, serif',
+          textColor: '#7a7265',
+          headingColor: '#332f29',
+          codeColor: '#8c765c',
+          codeBgColor: '#ede4d3',
+          quoteBorderColor: '#8c765c',
+          quoteTextColor: '#7a7265',
+          hrColor: '#e8dfd0',
           fontSize: 15,
         },
         onLinkClick: (url: string) => navigateTo(url),
@@ -709,9 +710,9 @@ function renderApp() {
       itemY += summaryText.height + 16;
 
       const readMore = new RichText(
-        [{ text: "阅读全文 →", style: { color: "#8c765c", href: post.url } }],
+        [{ text: '阅读全文 →', style: { color: '#8c765c', href: post.url } }],
         {
-          font: "14px Noto Sans SC, sans-serif",
+          font: '14px Noto Sans SC, sans-serif',
           onLinkClick: () => navigateTo(post.url),
         },
       );
@@ -730,20 +731,20 @@ function renderApp() {
     }
 
     page.height = listY;
-  } else if (payload.type === "page") {
+  } else if (payload.type === 'page') {
     // ── Post Detail ──────────────────────────────────────────────────────────
     let detailY = 0;
 
     const pageTitle = new RichText(
       [
         {
-          text: payload.title || "Untitled",
+          text: payload.title || 'Untitled',
           style: { fontSize: isMobile ? 32 : 44, bold: true },
         },
       ],
       {
         font: `${isMobile ? 32 : 44}px STKaiti, KaiTi, serif`,
-        color: "#332f29",
+        color: '#332f29',
         maxWidth: contentWidth,
       },
     );
@@ -755,33 +756,33 @@ function renderApp() {
     const views = viewsMap.get(payload.slug) ?? 0;
     let metaText = `${payload.date} · 字数: ${payload.word_count} 字 · 阅读: ${views} 次`;
     if (payload.tags && payload.tags.length > 0) {
-      metaText += ` · 标签: ${payload.tags.map((t: string) => `#${t}`).join(" ")}`;
+      metaText += ` · 标签: ${payload.tags.map((t: string) => `#${t}`).join(' ')}`;
     }
 
     const pageMeta = new Text(metaText, {
-      font: "14px Noto Sans SC, sans-serif",
-      color: "#7a7265",
+      font: '14px Noto Sans SC, sans-serif',
+      color: '#7a7265',
     });
     pageMeta.setPosition(0, detailY);
     page.add(pageMeta);
 
     detailY += pageMeta.height + 40;
 
-    let rawMarkdown = payload.raw_content || "";
+    let rawMarkdown = payload.raw_content || '';
     // Strip Zola TOML and YAML frontmatter (handle BOM and whitespace)
-    rawMarkdown = rawMarkdown.replace(/^\s*[\uFEFF]?(?:\+\+\+|---)[\s\S]*?(?:\+\+\+|---)\s*/, "");
+    rawMarkdown = rawMarkdown.replace(/^\s*[\uFEFF]?(?:\+\+\+|---)[\s\S]*?(?:\+\+\+|---)\s*/, '');
     const md = new CustomMarkdown(rawMarkdown, {
       maxWidth: contentWidth,
       theme: {
-        bodyFont: "Noto Serif SC, serif",
-        codeFont: "monospace",
-        textColor: "#332f29",
-        headingColor: "#332f29",
-        codeColor: "#8c765c",
-        codeBgColor: "#ede4d3",
-        quoteBorderColor: "#8c765c",
-        quoteTextColor: "#7a7265",
-        hrColor: "#e8dfd0",
+        bodyFont: 'Noto Serif SC, serif',
+        codeFont: 'monospace',
+        textColor: '#332f29',
+        headingColor: '#332f29',
+        codeColor: '#8c765c',
+        codeBgColor: '#ede4d3',
+        quoteBorderColor: '#8c765c',
+        quoteTextColor: '#7a7265',
+        hrColor: '#e8dfd0',
         fontSize: isMobile ? 18 : 22,
       },
       onLinkClick: (url: string) => navigateTo(url),
@@ -797,8 +798,8 @@ function renderApp() {
     if (payload.navigation?.earlier) {
       const ear = payload.navigation.earlier;
       const prev = new RichText(
-        [{ text: `← ${ear.title}`, style: { color: "#8c765c", href: ear.url } }],
-        { font: "14px Noto Sans SC, sans-serif", onLinkClick: () => navigateTo(ear.url) },
+        [{ text: `← ${ear.title}`, style: { color: '#8c765c', href: ear.url } }],
+        { font: '14px Noto Sans SC, sans-serif', onLinkClick: () => navigateTo(ear.url) },
       );
       prev.setPosition(0, 0);
       navEntity.add(prev);
@@ -807,8 +808,8 @@ function renderApp() {
     if (payload.navigation?.later) {
       const lat = payload.navigation.later;
       const nextText = new RichText(
-        [{ text: `${lat.title} →`, style: { color: "#8c765c", href: lat.url } }],
-        { font: "14px Noto Sans SC, sans-serif", onLinkClick: () => navigateTo(lat.url) },
+        [{ text: `${lat.title} →`, style: { color: '#8c765c', href: lat.url } }],
+        { font: '14px Noto Sans SC, sans-serif', onLinkClick: () => navigateTo(lat.url) },
       );
       nextText.setPosition(contentWidth - nextText.width, 0);
       navEntity.add(nextText);
@@ -818,9 +819,9 @@ function renderApp() {
     detailY += 40;
 
     detailY += 20;
-    const backBtn = new RichText([{ text: "← 返回列表", style: { color: "#8c765c", href: "/" } }], {
-      font: "14px Noto Sans SC, sans-serif",
-      onLinkClick: () => navigateTo("/"),
+    const backBtn = new RichText([{ text: '← 返回列表', style: { color: '#8c765c', href: '/' } }], {
+      font: '14px Noto Sans SC, sans-serif',
+      onLinkClick: () => navigateTo('/'),
     });
     backBtn.setPosition(0, detailY);
     page.add(backBtn);
@@ -843,7 +844,7 @@ function renderApp() {
         page.height = footerY + 80;
       }
 
-      if (typeof document !== "undefined") {
+      if (typeof document !== 'undefined') {
         document.body.style.height = `${page.height}px`;
         mainScroll.height = page.height;
       }
@@ -858,8 +859,8 @@ function renderApp() {
   footerContainer.setPosition(0, footerY);
 
   const footerText = new Text(`© ${new Date().getFullYear()} Xuepoo. Crafted in VectoJS.`, {
-    font: "12px Noto Sans SC, sans-serif",
-    color: "#7a7265",
+    font: '12px Noto Sans SC, sans-serif',
+    color: '#7a7265',
   });
   footerText.setPosition(0, 0);
   footerContainer.add(footerText);
@@ -868,7 +869,7 @@ function renderApp() {
   page.height = footerY + 80;
 
   // IMPORTANT: Set the document body height so native scrolling works
-  if (typeof document !== "undefined") {
+  if (typeof document !== 'undefined') {
     document.body.style.height = `${page.height}px`;
     mainScroll.height = page.height;
   }
@@ -884,7 +885,7 @@ function renderApp() {
 
 async function loadViewCounts() {
   try {
-    const res = await fetch("/api/views");
+    const res = await fetch('/api/views');
     if (res.ok) {
       const data = await res.json();
       for (const [slug, count] of Object.entries(data)) {
@@ -892,68 +893,76 @@ async function loadViewCounts() {
       }
     }
   } catch (e) {
-    console.error("Failed to load view counts", e);
+    console.error('Failed to load view counts', e);
   }
 }
 
 async function logCurrentPageView() {
-  if (currentPageData?.data?.type === "page") {
+  if (currentPageData?.data?.type === 'page') {
     const slug = currentPageData.data.slug;
     try {
       const url = `/api/views?slug=${encodeURIComponent(slug)}`;
-      const res = await fetch(url, { method: "POST" });
+      const res = await fetch(url, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
-        if (data && typeof data.views === "number") {
+        if (data && typeof data.views === 'number') {
           viewsMap.set(slug, data.views);
         }
       }
     } catch (e) {
-      console.error("Failed to log view", e);
+      console.error('Failed to log view', e);
     }
   }
 }
 
 // ─── Entry Point ──────────────────────────────────────────────────────────────
 
-document.addEventListener("DOMContentLoaded", async () => {
-  const canvas = document.getElementById("vecto-canvas") as HTMLCanvasElement;
+document.addEventListener('DOMContentLoaded', async () => {
+  const canvas = document.getElementById('vecto-canvas') as HTMLCanvasElement;
   if (!canvas) return;
 
   // Enable mobile touch scrolling on the fixed canvas overlay
   let touchStartY = 0;
-  canvas.addEventListener("touchstart", (e: TouchEvent) => {
-    if (e.touches && e.touches[0]) {
-      touchStartY = e.touches[0].clientY;
-    }
-  }, { passive: true });
+  canvas.addEventListener(
+    'touchstart',
+    (e: TouchEvent) => {
+      if (e.touches && e.touches[0]) {
+        touchStartY = e.touches[0].clientY;
+      }
+    },
+    { passive: true },
+  );
 
-  canvas.addEventListener("touchmove", (e: TouchEvent) => {
-    if (e.touches && e.touches[0]) {
-      const touchY = e.touches[0].clientY;
-      const deltaY = touchStartY - touchY;
-      touchStartY = touchY;
-      window.scrollBy(0, deltaY);
-    }
-  }, { passive: true });
+  canvas.addEventListener(
+    'touchmove',
+    (e: TouchEvent) => {
+      if (e.touches && e.touches[0]) {
+        const touchY = e.touches[0].clientY;
+        const deltaY = touchStartY - touchY;
+        touchStartY = touchY;
+        window.scrollBy(0, deltaY);
+      }
+    },
+    { passive: true },
+  );
 
   currentScene = new Scene(canvas, { maxFPS: 60 });
-  currentScene.renderMode = "onDemand";
+  currentScene.renderMode = 'onDemand';
   currentScene.start();
 
-  window.dispatchEvent(new Event("resize"));
+  window.dispatchEvent(new Event('resize'));
 
-  window.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && searchDropdown && currentSearchMatches.length > 0) {
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && searchDropdown && currentSearchMatches.length > 0) {
       navigateTo(currentSearchMatches[0].url);
     }
   });
 
   initSearchDatabase();
 
-  const dataElement = document.getElementById("page-data");
+  const dataElement = document.getElementById('page-data');
   if (dataElement) {
-    currentPageData = parsePageData(dataElement.textContent || "");
+    currentPageData = parsePageData(dataElement.textContent || '');
   }
 
   await loadViewCounts();
@@ -963,7 +972,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let lastWidth = window.innerWidth;
   let resizeAnimationFrameId: number | null = null;
-  window.addEventListener("resize", () => {
+  window.addEventListener('resize', () => {
     // On mobile, scrolling down hides the URL bar, triggering a resize (height change only).
     // If we rebuild the whole page, it destroys and re-parses all Markdown, leaking memory
     // and causing severe lag. We ONLY rebuild if the width changed!
@@ -980,15 +989,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  window.addEventListener("popstate", async () => {
+  window.addEventListener('popstate', async () => {
     // Clear image cache on navigation to prevent unbounded memory growth (400MB+)
-    if (typeof (imageCache as any).clear === "function") {
+    if (typeof (imageCache as any).clear === 'function') {
       imageCache.clear();
     }
     await handleUrlRoute(window.location.pathname);
   });
 
-  if (typeof document !== "undefined" && (document as any).fonts) {
+  if (typeof document !== 'undefined' && (document as any).fonts) {
     (document as any).fonts.ready.then(() => {
       renderPage();
     });
