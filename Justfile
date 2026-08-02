@@ -14,7 +14,7 @@ status:
 
 test:
     @echo "=== Running quality gates ==="
-    @if command -v pre-commit &>/dev/null; then pre-commit run --all-files; else echo "pre-commit not found"; fi
+    @bun run check
 
 deploy: test
     @echo "=== Processing assets and uploading to R2 ==="
