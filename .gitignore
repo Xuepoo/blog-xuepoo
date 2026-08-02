@@ -16,3 +16,4 @@ static/tmp/
 static/assets/
 .carryctx/config.local.toml
 .worktrees/
+tmp/

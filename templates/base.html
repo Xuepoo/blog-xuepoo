@@ -5,7 +5,13 @@
       window.errors = [];
       window.addEventListener("error", (e) => {
         window.errors.push(
-          e.message + " at " + e.filename + ":" + e.lineno + "\n" + (e.error ? e.error.stack : ""),
+          e.message +
+            " at " +
+            e.filename +
+            ":" +
+            e.lineno +
+            "\n" +
+            (e.error ? e.error.stack : ""),
         );
       });
       window.addEventListener("unhandledrejection", (e) => {
@@ -35,25 +41,6 @@
     <link rel="stylesheet" href="/css/page.css" />
     <link rel="stylesheet" href="/giallo-light.css" />
 
-    <!-- KaTeX Math Rendering Support -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" />
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
-    <script
-      defer
-      src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"
-      onload="
-        renderMathInElement(document.body, {
-          delimiters: [
-            { left: '$$', right: '$$', display: true },
-            { left: '$', right: '$', display: false },
-            { left: '\\(', right: '\\)', display: false },
-            { left: '\\[', right: '\\]', display: true },
-          ],
-          throwOnError: false,
-        })
-      "
-    ></script>
-
     {% block extra_head %}{% endblock extra_head %}
   </head>
   <body>
@@ -71,6 +58,6 @@
       }
     </script>
 
-    <script src="/js/blog-renderer.js?v=1.0.14" defer></script>
+    <script type="module" src="/js/index.js?v=1.1.0"></script>
   </body>
 </html>

@@ -2,8 +2,8 @@
   "name": "xuepoo-blog",
   "private": true,
   "scripts": {
-    "build": "bun build src/index.ts --outfile static/js/blog-renderer.js --minify",
-    "dev": "bun build src/index.ts --outfile static/js/blog-renderer.js --watch --minify",
+    "build": "rm -rf static/js && bun build src/index.ts --outdir static/js --splitting --minify",
+    "dev": "rm -rf static/js && bun build src/index.ts --outdir static/js --splitting --minify --watch",
     "obfuscate": "bun scripts/obfuscate.ts",
     "format": "oxfmt --write \"src/**/*.{js,ts,jsx,tsx,mjs,cjs,json}\"",
     "format:check": "oxfmt --check \"src/**/*.{js,ts,jsx,tsx,mjs,cjs,json}\"",
