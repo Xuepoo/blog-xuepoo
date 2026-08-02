@@ -39,64 +39,7 @@ const imageCache = new Map<string, { img: HTMLImageElement; aspectRatio: number 
 let _canvasWheelHandler: ((e: WheelEvent) => void) | null = null;
 let currentMainScroll: Container | null = null;
 
-import { marked, type Token } from 'marked';
-import katex from 'katex';
-
-class MathBlock extends Entity {
-  public isPointInside(_globalX: number, _globalY: number): boolean {
-    return false;
-  }
-  private img: HTMLImageElement | null = null;
-  private loaded = false;
-
-  constructor(htmlContent: string, width: number) {
-    super();
-    this.width = width;
-    this.height = 60;
-
-    const container = document.createElement('div');
-    container.style.position = 'absolute';
-    container.style.visibility = 'hidden';
-    container.style.color = '#332f29';
-    container.style.fontFamily = 'Noto Serif SC, serif';
-    container.style.width = `${width}px`;
-    container.innerHTML = htmlContent;
-    document.body.appendChild(container);
-
-    const w = container.offsetWidth || width;
-    const h = container.offsetHeight || 40;
-    this.height = h + 20;
-
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-        <foreignObject width="100%" height="100%">
-          <div xmlns="http://www.w3.org/1999/xhtml" style="color: #332f29; font-family: 'Noto Serif SC', serif; line-height: 1.85;">
-            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" />
-            ${htmlContent}
-          </div>
-        </foreignObject>
-      </svg>
-    `;
-
-    document.body.removeChild(container);
-
-    const img = new Image();
-    img.onload = () => {
-      this.img = img;
-      this.loaded = true;
-      this.width = w;
-      this.height = h + 20;
-      currentScene?.markDirty();
-    };
-    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg.trim());
-  }
-
-  public render(r: any): void {
-    if (this.loaded && this.img) {
-      r.drawImage(this.img, Math.max(0, (this.width - this.img.width) / 2), 10);
-    }
-  }
-}
+import type { Token } from 'marked';
 
 class BlogImage extends Entity {
   public isPointInside(_globalX: number, _globalY: number): boolean {
@@ -178,42 +121,8 @@ function requestLayout(entity: any) {
   }
 }
 
-const mathExtension = {
-  name: 'math',
-  level: 'block',
-  start(src: string) {
-    return src.match(/\$\$/)?.index;
-  },
-  tokenizer(src: string, _tokens: any) {
-    const match = /^\$\$([\s\S]+?)\$\$/.exec(src);
-    if (match) {
-      return {
-        type: 'math',
-        raw: match[0],
-        text: match[1]!.trim(),
-      };
-    }
-  },
-  renderer(token: any) {
-    return token.text;
-  },
-};
-marked.use({ extensions: [mathExtension] });
-
 class CustomMarkdown extends Markdown {
   protected override renderToken(token: Token): Entity | null {
-    if (token.type === 'math') {
-      try {
-        const htmlContent = katex.renderToString((token as any).text, {
-          displayMode: true,
-          throwOnError: false,
-        });
-        return new MathBlock(htmlContent, this.maxWidth);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
     if (token.type === 'paragraph') {
       const pToken = token as any;
       if (pToken.tokens && pToken.tokens.length === 1 && pToken.tokens[0].type === 'image') {
@@ -798,8 +707,16 @@ function renderApp() {
     if (payload.navigation?.earlier) {
       const ear = payload.navigation.earlier;
       const prev = new RichText(
-        [{ text: `← ${ear.title}`, style: { color: '#8c765c', href: ear.url } }],
-        { font: '14px Noto Sans SC, sans-serif', onLinkClick: () => navigateTo(ear.url) },
+        [
+          {
+            text: `← ${ear.title}`,
+            style: { color: '#8c765c', href: ear.url },
+          },
+        ],
+        {
+          font: '14px Noto Sans SC, sans-serif',
+          onLinkClick: () => navigateTo(ear.url),
+        },
       );
       prev.setPosition(0, 0);
       navEntity.add(prev);
@@ -808,8 +725,16 @@ function renderApp() {
     if (payload.navigation?.later) {
       const lat = payload.navigation.later;
       const nextText = new RichText(
-        [{ text: `${lat.title} →`, style: { color: '#8c765c', href: lat.url } }],
-        { font: '14px Noto Sans SC, sans-serif', onLinkClick: () => navigateTo(lat.url) },
+        [
+          {
+            text: `${lat.title} →`,
+            style: { color: '#8c765c', href: lat.url },
+          },
+        ],
+        {
+          font: '14px Noto Sans SC, sans-serif',
+          onLinkClick: () => navigateTo(lat.url),
+        },
       );
       nextText.setPosition(contentWidth - nextText.width, 0);
       navEntity.add(nextText);
