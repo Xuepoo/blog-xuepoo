@@ -10,15 +10,17 @@ pre-commit:
   parallel: false
   jobs:
     - name: oxfmt
-      glob: '*.{js,ts,jsx,tsx,mjs,cjs,json}'
+      glob: "*.{js,ts,jsx,tsx,mjs,cjs,json}"
+      exclude: "static/**"
       run: bunx oxfmt --write {staged_files}
       stage_fixed: true
     - name: oxlint
-      glob: '*.{js,ts,jsx,tsx,mjs,cjs}'
+      glob: "*.{js,ts,jsx,tsx,mjs,cjs}"
+      exclude: "static/**"
       run: bunx oxlint --fix {staged_files}
       stage_fixed: true
     - name: markdownlint
-      glob: '*.md'
+      glob: "*.md"
       run: bunx markdownlint-cli2 --fix {staged_files}
       stage_fixed: true
 

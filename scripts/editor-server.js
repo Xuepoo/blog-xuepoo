@@ -1,32 +1,32 @@
-const http = require("http");
-const fs = require("fs");
-const path = require("path");
-const { spawn } = require("child_process");
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const { spawn } = require('child_process');
 
 // Load config from editor-config.json with default fallback
-const CONFIG_FILE = path.join(__dirname, "../editor-config.json");
+const CONFIG_FILE = path.join(__dirname, '../editor-config.json');
 const DEFAULT_CONFIG = {
   apiPort: 8086,
   zolaPort: 8085,
-  postsDir: "content/posts",
-  staticDir: "static",
-  imagesDir: "static/tmp/raw/images",
-  webPathPrefix: "/tmp/raw/images",
+  postsDir: 'content/posts',
+  staticDir: 'static',
+  imagesDir: 'static/tmp/raw/images',
+  webPathPrefix: '/tmp/raw/images',
 };
 
 let config = { ...DEFAULT_CONFIG };
 if (fs.existsSync(CONFIG_FILE)) {
   try {
-    const userConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+    const userConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
     config = { ...DEFAULT_CONFIG, ...userConfig };
   } catch (err) {
-    console.error("Failed to parse editor-config.json, using defaults.", err);
+    console.error('Failed to parse editor-config.json, using defaults.', err);
   }
 }
 
 const PORT = config.apiPort;
-const POSTS_DIR = path.resolve(__dirname, "..", config.postsDir);
-const RAW_IMG_DIR = path.resolve(__dirname, "..", config.imagesDir);
+const POSTS_DIR = path.resolve(__dirname, '..', config.postsDir);
+const RAW_IMG_DIR = path.resolve(__dirname, '..', config.imagesDir);
 
 // Ensure directories exist
 if (!fs.existsSync(POSTS_DIR)) fs.mkdirSync(POSTS_DIR, { recursive: true });
@@ -34,35 +34,35 @@ if (!fs.existsSync(RAW_IMG_DIR)) fs.mkdirSync(RAW_IMG_DIR, { recursive: true });
 
 // Programmatically spawn zola serve as a child process to prevent background port leaks
 // Bind to 0.0.0.0 to support remote dev forwarding
-const zola = spawn("zola", ["serve", "-p", String(config.zolaPort), "-i", "0.0.0.0"], {
-  stdio: "inherit",
-  cwd: path.join(__dirname, ".."),
+const zola = spawn('zola', ['serve', '-p', String(config.zolaPort), '-i', '0.0.0.0'], {
+  stdio: 'inherit',
+  cwd: path.join(__dirname, '..'),
 });
 
-zola.on("error", (err) => {
-  console.error("Failed to start Zola server:", err);
+zola.on('error', (err) => {
+  console.error('Failed to start Zola server:', err);
 });
 
 // Clean up child process on exit
-process.on("SIGINT", () => {
+process.on('SIGINT', () => {
   zola.kill();
   process.exit();
 });
-process.on("SIGTERM", () => {
+process.on('SIGTERM', () => {
   zola.kill();
   process.exit();
 });
-process.on("exit", () => {
+process.on('exit', () => {
   zola.kill();
 });
 
 function isRelativeImagePath(url) {
   if (!url) return false;
   if (
-    url.startsWith("http://") ||
-    url.startsWith("https://") ||
-    url.startsWith("data:") ||
-    url.startsWith("/")
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('data:') ||
+    url.startsWith('/')
   ) {
     return false;
   }
@@ -82,16 +82,16 @@ function copyRelativeImageToTemp(baseDir, imgRelativePath) {
       return `/tmp/raw/images/${uniqueName}`;
     }
   } catch (err) {
-    console.error("Failed to copy image:", imgRelativePath, err);
+    console.error('Failed to copy image:', imgRelativePath, err);
   }
   return null;
 }
 
 function processImportedMarkdown(filePath) {
   if (!fs.existsSync(filePath)) {
-    throw new Error("File not found: " + filePath);
+    throw new Error('File not found: ' + filePath);
   }
-  let content = fs.readFileSync(filePath, "utf-8");
+  let content = fs.readFileSync(filePath, 'utf-8');
   const baseDir = path.dirname(filePath);
 
   // 1. Match Markdown images: ![alt](url)
@@ -99,12 +99,12 @@ function processImportedMarkdown(filePath) {
     /(!\[[^\]]*?\]\()([^)]+?)(\))/g,
     (match, prefix, imgUrlAndTitle, suffix) => {
       const parts = imgUrlAndTitle.trim().split(/\s+/);
-      let imgUrl = parts[0].replace(/^["']|["']$/g, "");
+      let imgUrl = parts[0].replace(/^["']|["']$/g, '');
 
       if (isRelativeImagePath(imgUrl)) {
         const newUrl = copyRelativeImageToTemp(baseDir, imgUrl);
         if (newUrl) {
-          const titlePart = parts.slice(1).join(" ");
+          const titlePart = parts.slice(1).join(' ');
           const newUrlAndTitle = titlePart ? `${newUrl} ${titlePart}` : newUrl;
           return `${prefix}${newUrlAndTitle}${suffix}`;
         }
@@ -132,34 +132,34 @@ function processImportedMarkdown(filePath) {
 
 function parseFrontmatter(fileContent) {
   const content = fileContent.trimStart();
-  if (!content.startsWith("+++")) {
+  if (!content.startsWith('+++')) {
     return { frontmatter: {}, body: fileContent };
   }
-  const secondPlusPlusPlusIndex = content.indexOf("+++", 3);
+  const secondPlusPlusPlusIndex = content.indexOf('+++', 3);
   if (secondPlusPlusPlusIndex === -1) {
     return { frontmatter: {}, body: fileContent };
   }
   const fmRaw = content.slice(3, secondPlusPlusPlusIndex).trim();
   let body = content.slice(secondPlusPlusPlusIndex + 3);
-  if (body.startsWith("\r\n")) {
+  if (body.startsWith('\r\n')) {
     body = body.slice(2);
-  } else if (body.startsWith("\n")) {
+  } else if (body.startsWith('\n')) {
     body = body.slice(1);
   }
   const frontmatter = {};
 
   // Simple TOML-like parser for key-value strings
-  fmRaw.split("\n").forEach((line) => {
-    const parts = line.split("=");
+  fmRaw.split('\n').forEach((line) => {
+    const parts = line.split('=');
     if (parts.length >= 2) {
       const key = parts[0].trim();
-      let val = parts.slice(1).join("=").trim().replace(/^"|"$/g, "");
+      let val = parts.slice(1).join('=').trim().replace(/^"|"$/g, '');
       // Support array tags = ["A", "B"]
-      if (val.startsWith("[") && val.endsWith("]")) {
+      if (val.startsWith('[') && val.endsWith(']')) {
         val = val
           .substring(1, val.length - 1)
-          .split(",")
-          .map((s) => s.trim().replace(/^"|"$/g, ""))
+          .split(',')
+          .map((s) => s.trim().replace(/^"|"$/g, ''))
           .filter(Boolean);
       }
       frontmatter[key] = val;
@@ -169,172 +169,172 @@ function parseFrontmatter(fileContent) {
 }
 
 function stringifyFrontmatter(frontmatter, body) {
-  let fmRaw = "+++\n";
-  let taxRaw = "";
+  let fmRaw = '+++\n';
+  let taxRaw = '';
   for (const [key, val] of Object.entries(frontmatter)) {
-    if (key === "tags") {
-      taxRaw += `[taxonomies]\ntags = [${val.map((v) => `"${v}"`).join(", ")}]\n`;
+    if (key === 'tags') {
+      taxRaw += `[taxonomies]\ntags = [${val.map((v) => `"${v}"`).join(', ')}]\n`;
     } else if (Array.isArray(val)) {
-      fmRaw += `${key} = [${val.map((v) => `"${v}"`).join(", ")}]\n`;
+      fmRaw += `${key} = [${val.map((v) => `"${v}"`).join(', ')}]\n`;
     } else {
       fmRaw += `${key} = "${val}"\n`;
     }
   }
   fmRaw += taxRaw;
-  fmRaw += "+++\n";
+  fmRaw += '+++\n';
   return fmRaw + body;
 }
 
 const server = http.createServer((req, res) => {
   // CORS Headers
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-filename");
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-filename');
 
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     res.writeHead(200);
     res.end();
     return;
   }
 
   // --- Static Assets Mapping ---
-  if (req.url === "/tmp/easymde.min.js") {
-    const jsPath = path.resolve(__dirname, "..", config.staticDir, "tmp/easymde.min.js");
+  if (req.url === '/tmp/easymde.min.js') {
+    const jsPath = path.resolve(__dirname, '..', config.staticDir, 'tmp/easymde.min.js');
     if (fs.existsSync(jsPath)) {
-      res.writeHead(200, { "Content-Type": "application/javascript" });
+      res.writeHead(200, { 'Content-Type': 'application/javascript' });
       res.end(fs.readFileSync(jsPath));
       return;
     }
   }
-  if (req.url === "/tmp/easymde.min.css") {
-    const cssPath = path.resolve(__dirname, "..", config.staticDir, "tmp/easymde.min.css");
+  if (req.url === '/tmp/easymde.min.css') {
+    const cssPath = path.resolve(__dirname, '..', config.staticDir, 'tmp/easymde.min.css');
     if (fs.existsSync(cssPath)) {
-      res.writeHead(200, { "Content-Type": "text/css" });
+      res.writeHead(200, { 'Content-Type': 'text/css' });
       res.end(fs.readFileSync(cssPath));
       return;
     }
   }
-  if (req.url === "/favicon.svg") {
-    const faviconPath = path.resolve(__dirname, "..", config.staticDir, "favicon.svg");
+  if (req.url === '/favicon.svg') {
+    const faviconPath = path.resolve(__dirname, '..', config.staticDir, 'favicon.svg');
     if (fs.existsSync(faviconPath)) {
-      res.writeHead(200, { "Content-Type": "image/svg+xml" });
+      res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
       res.end(fs.readFileSync(faviconPath));
       return;
     }
   }
-  if (req.url === "/css/page.css") {
-    const cssPath = path.resolve(__dirname, "..", config.staticDir, "css/page.css");
+  if (req.url === '/css/page.css') {
+    const cssPath = path.resolve(__dirname, '..', config.staticDir, 'css/page.css');
     if (fs.existsSync(cssPath)) {
-      res.writeHead(200, { "Content-Type": "text/css" });
+      res.writeHead(200, { 'Content-Type': 'text/css' });
       res.end(fs.readFileSync(cssPath));
       return;
     }
   }
-  if (req.url === "/giallo-light.css") {
-    const cssPath = path.resolve(__dirname, "..", config.staticDir, "giallo-light.css");
+  if (req.url === '/giallo-light.css') {
+    const cssPath = path.resolve(__dirname, '..', config.staticDir, 'giallo-light.css');
     if (fs.existsSync(cssPath)) {
-      res.writeHead(200, { "Content-Type": "text/css" });
+      res.writeHead(200, { 'Content-Type': 'text/css' });
       res.end(fs.readFileSync(cssPath));
       return;
     }
   }
-  if (req.url === "/tmp/marked.min.js") {
-    const jsPath = path.resolve(__dirname, "..", config.staticDir, "tmp/marked.min.js");
+  if (req.url === '/tmp/marked.min.js') {
+    const jsPath = path.resolve(__dirname, '..', config.staticDir, 'tmp/marked.min.js');
     if (fs.existsSync(jsPath)) {
-      res.writeHead(200, { "Content-Type": "application/javascript" });
+      res.writeHead(200, { 'Content-Type': 'application/javascript' });
       res.end(fs.readFileSync(jsPath));
       return;
     }
   }
-  if (req.url.startsWith(config.webPathPrefix + "/")) {
+  if (req.url.startsWith(config.webPathPrefix + '/')) {
     const filename = path.basename(req.url);
     const filePath = path.join(RAW_IMG_DIR, filename);
     if (fs.existsSync(filePath)) {
       const ext = path.extname(filePath).toLowerCase();
-      let contentType = "image/png";
-      if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
-      else if (ext === ".gif") contentType = "image/gif";
-      else if (ext === ".webp") contentType = "image/webp";
-      else if (ext === ".svg") contentType = "image/svg+xml";
+      let contentType = 'image/png';
+      if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+      else if (ext === '.gif') contentType = 'image/gif';
+      else if (ext === '.webp') contentType = 'image/webp';
+      else if (ext === '.svg') contentType = 'image/svg+xml';
 
-      res.writeHead(200, { "Content-Type": contentType });
+      res.writeHead(200, { 'Content-Type': contentType });
       res.end(fs.readFileSync(filePath));
       return;
     }
   }
 
   // --- API Router ---
-  if (req.url === "/api/posts" && req.method === "GET") {
+  if (req.url === '/api/posts' && req.method === 'GET') {
     fs.readdir(POSTS_DIR, (err, files) => {
       if (err) {
-        res.writeHead(500, { "Content-Type": "application/json" });
+        res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: err.message }));
         return;
       }
       const posts = files
-        .filter((f) => f.endsWith(".md") && f !== "_index.md")
+        .filter((f) => f.endsWith('.md') && f !== '_index.md')
         .map((f) => {
-          const content = fs.readFileSync(path.join(POSTS_DIR, f), "utf-8");
+          const content = fs.readFileSync(path.join(POSTS_DIR, f), 'utf-8');
           const { frontmatter } = parseFrontmatter(content);
           return {
             filename: f,
             title: frontmatter.title || f,
-            date: frontmatter.date || "",
+            date: frontmatter.date || '',
             tags: frontmatter.tags || [],
           };
         });
       // Sort posts by date descending
       posts.sort((a, b) => b.date.localeCompare(a.date));
-      res.writeHead(200, { "Content-Type": "application/json" });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(posts));
     });
-  } else if (req.url.startsWith("/api/posts/") && req.method === "GET") {
+  } else if (req.url.startsWith('/api/posts/') && req.method === 'GET') {
     const filename = decodeURIComponent(req.url.substring(11));
     const filePath = path.join(POSTS_DIR, filename);
     if (!fs.existsSync(filePath)) {
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "File not found" }));
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'File not found' }));
       return;
     }
-    const fileContent = fs.readFileSync(filePath, "utf-8");
+    const fileContent = fs.readFileSync(filePath, 'utf-8');
     const { frontmatter, body } = parseFrontmatter(fileContent);
-    res.writeHead(200, { "Content-Type": "application/json" });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ filename, frontmatter, body }));
-  } else if (req.url.startsWith("/api/posts/") && req.method === "POST") {
+  } else if (req.url.startsWith('/api/posts/') && req.method === 'POST') {
     const filename = decodeURIComponent(req.url.substring(11));
     const filePath = path.join(POSTS_DIR, filename);
-    let bodyData = "";
-    req.on("data", (chunk) => {
+    let bodyData = '';
+    req.on('data', (chunk) => {
       bodyData += chunk;
     });
-    req.on("end", () => {
+    req.on('end', () => {
       try {
         const { frontmatter, body } = JSON.parse(bodyData);
         const fileContent = stringifyFrontmatter(frontmatter, body);
-        fs.writeFileSync(filePath, fileContent, "utf-8");
-        res.writeHead(200, { "Content-Type": "application/json" });
+        fs.writeFileSync(filePath, fileContent, 'utf-8');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
       } catch (err) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Invalid JSON payload" }));
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid JSON payload' }));
       }
     });
-  } else if (req.url === "/api/import" && req.method === "POST") {
-    let bodyData = "";
-    req.on("data", (chunk) => {
+  } else if (req.url === '/api/import' && req.method === 'POST') {
+    let bodyData = '';
+    req.on('data', (chunk) => {
       bodyData += chunk;
     });
-    req.on("end", () => {
+    req.on('end', () => {
       try {
         const { filePath } = JSON.parse(bodyData);
         if (!filePath) {
-          res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "Missing filePath parameter" }));
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Missing filePath parameter' }));
           return;
         }
         if (!fs.existsSync(filePath)) {
-          res.writeHead(404, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "File not found: " + filePath }));
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'File not found: ' + filePath }));
           return;
         }
 
@@ -347,16 +347,16 @@ const server = http.createServer((req, res) => {
           frontmatter.title = path.basename(filePath, path.extname(filePath));
         }
         if (!frontmatter.date) {
-          frontmatter.date = new Date().toISOString().split("T")[0];
+          frontmatter.date = new Date().toISOString().split('T')[0];
         }
         if (!frontmatter.tags) {
-          frontmatter.tags = ["imported"];
+          frontmatter.tags = ['imported'];
         }
         if (!frontmatter.description) {
-          frontmatter.description = "Imported article from: " + filePath;
+          frontmatter.description = 'Imported article from: ' + filePath;
         }
 
-        res.writeHead(200, { "Content-Type": "application/json" });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
             success: true,
@@ -366,57 +366,57 @@ const server = http.createServer((req, res) => {
           }),
         );
       } catch (err) {
-        res.writeHead(500, { "Content-Type": "application/json" });
+        res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: err.message }));
       }
     });
-  } else if (req.url.startsWith("/api/posts/") && req.method === "DELETE") {
+  } else if (req.url.startsWith('/api/posts/') && req.method === 'DELETE') {
     const filename = decodeURIComponent(req.url.substring(11));
     const filePath = path.join(POSTS_DIR, filename);
     if (!fs.existsSync(filePath)) {
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "File not found" }));
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'File not found' }));
       return;
     }
     try {
       fs.unlinkSync(filePath);
-      res.writeHead(200, { "Content-Type": "application/json" });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true }));
     } catch (err) {
-      res.writeHead(500, { "Content-Type": "application/json" });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));
     }
-  } else if (req.url === "/api/images" && req.method === "POST") {
+  } else if (req.url === '/api/images' && req.method === 'POST') {
     let chunks = [];
-    let filename = req.headers["x-filename"] || `image-${Date.now()}.png`;
+    let filename = req.headers['x-filename'] || `image-${Date.now()}.png`;
 
     // Make filename unique to prevent overwritten pasted images
-    const ext = path.extname(filename) || ".png";
+    const ext = path.extname(filename) || '.png';
     const base = path.basename(filename, ext);
     if (
-      base.toLowerCase() === "image" ||
-      base.toLowerCase() === "blob" ||
-      base.toLowerCase().startsWith("pasted-image")
+      base.toLowerCase() === 'image' ||
+      base.toLowerCase() === 'blob' ||
+      base.toLowerCase().startsWith('pasted-image')
     ) {
       filename = `pasted-${Date.now()}-${Math.random().toString(36).substring(2, 8)}${ext}`;
     } else {
       filename = `${base}-${Date.now()}${ext}`;
     }
 
-    req.on("data", (chunk) => {
+    req.on('data', (chunk) => {
       chunks.push(chunk);
     });
-    req.on("end", () => {
+    req.on('end', () => {
       const buffer = Buffer.concat(chunks);
       const filePath = path.join(RAW_IMG_DIR, filename);
       fs.writeFileSync(filePath, buffer);
-      res.writeHead(200, { "Content-Type": "application/json" });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, localPath: `${config.webPathPrefix}/${filename}` }));
     });
   } else {
     // Serve HTML Editor UI directly for root request
     const uiHtml = getEditorHtml();
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(uiHtml);
   }
 });
@@ -1758,6 +1758,6 @@ function getEditorHtml() {
 </html>`;
 }
 
-server.listen(PORT, "0.0.0.0", () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Dev API Server running at http://0.0.0.0:${PORT}`);
 });

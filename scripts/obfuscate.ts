@@ -1,10 +1,10 @@
-import { readdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 const key = 42;
 
 function encrypt(text: string): string {
   const buf = Buffer.from(text, 'utf-8');
-  const encrypted = buf.map(b => b ^ key);
+  const encrypted = buf.map((b) => b ^ key);
   return Buffer.from(encrypted).toString('base64');
 }
 async function walk(dir: string, fileList: string[] = []): Promise<string[]> {
@@ -22,7 +22,7 @@ async function walk(dir: string, fileList: string[] = []): Promise<string[]> {
 }
 
 async function run() {
-  const publicDir = join(import.meta.dir, "../public");
+  const publicDir = join(import.meta.dir, '../public');
   console.log(`=== Starting obfuscation in ${publicDir} ===`);
   const files = await walk(publicDir);
   let processedCount = 0;
@@ -31,7 +31,8 @@ async function run() {
     let content = await Bun.file(file).text();
     let modified = false;
     // Obfuscate page-data
-    const pageDataRegex = /<script\s+id=["']?page-data["']?\s+type=["']?text\/plain["']?>([\s\S]*?)<\/script>/gi;
+    const pageDataRegex =
+      /<script\s+id=["']?page-data["']?\s+type=["']?text\/plain["']?>([\s\S]*?)<\/script>/gi;
     content = content.replace(pageDataRegex, (match, p1) => {
       const trimmed = p1.trim();
       if (!trimmed || trimmed.startsWith('e:')) return match; // Already obfuscated or empty
@@ -40,7 +41,8 @@ async function run() {
     });
 
     // Obfuscate search-data
-    const searchDataRegex = /<script\s+id=["']?search-data["']?\s+type=["']?text\/plain["']?>([\s\S]*?)<\/script>/gi;
+    const searchDataRegex =
+      /<script\s+id=["']?search-data["']?\s+type=["']?text\/plain["']?>([\s\S]*?)<\/script>/gi;
     content = content.replace(searchDataRegex, (match, p1) => {
       const trimmed = p1.trim();
       if (!trimmed || trimmed.startsWith('e:')) return match; // Already obfuscated or empty
