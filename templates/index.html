@@ -5,7 +5,7 @@ not first %},{% endif %} {% set_global first = false %} { "title": {{ page.title
 | json_encode | safe }}, "url": {{ page.permalink | json_encode | safe }}, "date": {{ page.date |
 date(format='%Y-%m-%d') | json_encode | safe }}, "slug": {{ page.slug | safe | json_encode | safe
 }}, "description": {{ page.description | default(value="") | json_encode | safe }}, "summary": {{
-page.summary | default(value="") | json_encode | safe }}, "tags": {{ page.taxonomies.tags |
+(page.summary or "") | striptags | json_encode | safe }}, "tags": {{ page.taxonomies.tags |
 default(value=[]) | json_encode | safe }} } {% endif %} {% endfor %} ], "paginator": { "previous":
 {% if paginator and paginator.previous %}"{{ paginator.previous }}"{% else %}null{% endif %},
 "next": {% if paginator and paginator.next %}"{{ paginator.next }}"{% else %}null{% endif %} } } {%

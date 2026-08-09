@@ -14,10 +14,10 @@
     "prepare": "lefthook install"
   },
   "dependencies": {
-    "@vectojs/core": "^1.27.1",
-    "@vectojs/markdown": "^0.6.0",
-    "@vectojs/ui": "^2.8.0",
-    "marked": "^18.0.7"
+    "@vectojs/core": "^1.32.7",
+    "@vectojs/markdown": "^0.18.0",
+    "@vectojs/ui": "^2.15.1",
+    "marked": "^18.0.9"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.6",

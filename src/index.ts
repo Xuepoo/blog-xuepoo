@@ -1,6 +1,7 @@
-import { Scene, Entity } from '@vectojs/core';
+import { Scene, Entity, type IRenderer, type A11yAttributes, VectoJSEvent } from '@vectojs/core';
 import { Text, RichText, Input, Card } from '@vectojs/ui';
 import { Markdown } from '@vectojs/markdown';
+import type { Token } from 'marked';
 
 const key = 42;
 
@@ -34,106 +35,9 @@ let searchDatabase: any[] = [];
 let searchDropdown: any = null;
 let currentSearchMatches: any[] = [];
 let viewsMap = new Map<string, number>();
-const imageCache = new Map<string, { img: HTMLImageElement; aspectRatio: number }>();
 // Wheel handler attached to the canvas for scroll (Scene does not forward wheel events)
 let _canvasWheelHandler: ((e: WheelEvent) => void) | null = null;
 let currentMainScroll: Container | null = null;
-
-import type { Token } from 'marked';
-
-class BlogImage extends Entity {
-  public isPointInside(_globalX: number, _globalY: number): boolean {
-    return false;
-  }
-  private img: HTMLImageElement | null = null;
-  private loaded = false;
-  private src: string;
-  private alt: string;
-  private maxWidth: number;
-
-  constructor(src: string, alt: string, maxWidth: number) {
-    super();
-    this.src = src;
-    this.alt = alt;
-    this.maxWidth = maxWidth;
-    this.width = maxWidth;
-
-    const cached = imageCache.get(src);
-    if (cached) {
-      this.loaded = true;
-      this.img = cached.img;
-      this.height = Math.round(this.maxWidth * cached.aspectRatio);
-    } else {
-      this.height = 300;
-      if (typeof window !== 'undefined') {
-        const img = new window.Image();
-        img.onload = () => {
-          this.loaded = true;
-          this.img = img;
-          const w = img.naturalWidth || 1;
-          const h = img.naturalHeight || 1;
-          const aspectRatio = h / w;
-          this.height = Math.round(this.maxWidth * aspectRatio);
-          imageCache.set(src, { img, aspectRatio });
-          requestLayout(this);
-          currentScene?.markDirty();
-        };
-        img.onerror = () => {
-          this.loaded = false;
-          const aspectRatio = 150 / this.maxWidth;
-          this.height = 150;
-          imageCache.set(src, { img, aspectRatio });
-          requestLayout(this);
-          currentScene?.markDirty();
-        };
-        img.src = src;
-      }
-    }
-  }
-
-  public render(r: any): void {
-    if (this.loaded && this.img) {
-      r.drawImage(this.img, 0, 0, this.width, this.height);
-    } else {
-      r.save();
-      r.beginPath();
-      r.roundRect(0, 0, this.width, this.height, 6);
-      r.fill('#ede4d3');
-      r.restore();
-    }
-  }
-}
-
-function requestLayout(entity: any) {
-  let curr = entity;
-  while (curr) {
-    if (curr.content && typeof curr.content.layout === 'function') {
-      curr.content.layout();
-      curr.width = curr.content.width;
-      curr.height = curr.content.height;
-    } else if (typeof curr.layout === 'function') {
-      curr.layout();
-    }
-    if (typeof curr.onHeightChanged === 'function') {
-      curr.onHeightChanged();
-    }
-    curr = curr.parent;
-  }
-}
-
-class CustomMarkdown extends Markdown {
-  protected override renderToken(token: Token): Entity | null {
-    if (token.type === 'paragraph') {
-      const pToken = token as any;
-      if (pToken.tokens && pToken.tokens.length === 1 && pToken.tokens[0].type === 'image') {
-        const imgToken = pToken.tokens[0];
-        return new BlogImage(imgToken.href, imgToken.text, this.maxWidth);
-      }
-    }
-
-    return super.renderToken(token);
-  }
-}
 
 class DividerLine extends Entity {
   public isPointInside(_globalX: number, _globalY: number): boolean {
@@ -159,6 +63,237 @@ class Container extends Entity {
     return false;
   }
   public render(_r: any): void {}
+}
+
+// ─── Table of Contents (native VectoJS, mirrors the pre-SPA Tera TOC) ─────────
+
+interface TocEntry {
+  title: string;
+  permalink: string;
+  children?: TocEntry[];
+}
+
+/**
+ * One TOC row: a presentational `RichText` label wrapped in an interactive
+ * entity that projects `role: 'link'` with a real tab stop and activates on
+ * click or Enter/Space — the accessible-control shape `getA11yAttributes()`
+ * needs (a bare `interactive = true` `RichText` would report only its text
+ * as a label, with no role or keyboard path).
+ */
+class TocLinkRow extends Entity {
+  public isPointInside(globalX: number, globalY: number): boolean {
+    const local = this.worldToLocal(globalX, globalY);
+    if (!local) return false;
+    return local.x >= 0 && local.x <= this.width && local.y >= 0 && local.y <= this.height;
+  }
+  constructor(
+    private readonly title: string,
+    width: number,
+    private readonly onActivate: () => void,
+  ) {
+    super();
+    this.interactive = true;
+    const label = new RichText([{ text: title, style: { color: '#7a7265' } }], {
+      font: '13px Noto Sans SC, sans-serif',
+      maxWidth: width,
+    });
+    this.add(label);
+    this.width = width;
+    this.height = label.height;
+    this.on('click', () => this.onActivate());
+    this.on('keydown', (e: VectoJSEvent<KeyboardEvent>) => {
+      if (e.nativeEvent?.key === 'Enter' || e.nativeEvent?.key === ' ') this.onActivate();
+    });
+  }
+  public override getA11yAttributes(): A11yAttributes {
+    return { role: 'link', label: this.title, tabIndex: 0 };
+  }
+  public render(_r: IRenderer): void {}
+}
+
+function buildTocRow(
+  entry: TocEntry,
+  indent: number,
+  width: number,
+  onActivate: () => void,
+): TocLinkRow {
+  const row = new TocLinkRow(entry.title, width - indent, onActivate);
+  row.setPosition(indent, 0);
+  return row;
+}
+
+/**
+ * Lays out a flat h1/h2 TOC tree into a vertical stack of rows, returning the
+ * total height. `onNavigate` receives each row's index into
+ * {@link flattenToc}'s document-order sequence, so the caller can scroll to
+ * the matching heading entity without needing a DOM anchor.
+ */
+function layoutTocRows(
+  container: Entity,
+  toc: TocEntry[],
+  width: number,
+  onNavigate: (flatIndex: number) => void,
+): number {
+  let y = 0;
+  let flatIndex = 0;
+  for (const h1 of toc) {
+    const index = flatIndex++;
+    const row = buildTocRow(h1, 0, width, () => onNavigate(index));
+    row.setPosition(0, y);
+    container.add(row);
+    y += row.height + 6;
+    for (const h2 of h1.children ?? []) {
+      const childIndex = flatIndex++;
+      const child = buildTocRow(h2, 16, width, () => onNavigate(childIndex));
+      child.setPosition(16, y);
+      container.add(child);
+      y += child.height + 6;
+    }
+  }
+  return Math.max(0, y - 6);
+}
+
+/**
+ * Desktop sticky sidebar TOC. Lives in the Scene overlay layer (viewport-fixed,
+ * like the old CSS `position: sticky`) rather than in `mainScroll`, so it does
+ * not need its own scroll-position math — the overlay layer is not affected by
+ * `mainScroll.y`. Repositioned on every resize by the caller.
+ */
+class TocSidebar extends Entity {
+  public isPointInside(_globalX: number, _globalY: number): boolean {
+    return false;
+  }
+  constructor(toc: TocEntry[], width: number, onNavigate: (flatIndex: number) => void) {
+    super();
+    this.width = width;
+
+    const title = new Text('目录', {
+      font: '600 13px Noto Sans SC, sans-serif',
+      color: '#332f29',
+    });
+    this.add(title);
+
+    const list = new Container();
+    list.setPosition(0, title.height + 12);
+    this.add(list);
+
+    this.height = title.height + 12 + layoutTocRows(list, toc, width, onNavigate);
+  }
+  public render(_r: IRenderer): void {}
+}
+
+/**
+ * Mobile collapsible TOC (`<details class="mobile-toc">` equivalent): a
+ * tappable header that expands/collapses the row list, inline in the
+ * article flow. Calls `onToggle` after every toggle so the caller can reflow
+ * content below it.
+ */
+class MobileToc extends Entity {
+  public isPointInside(_globalX: number, _globalY: number): boolean {
+    return false;
+  }
+  private expanded = false;
+  private header: Card;
+  private headerLabel: RichText;
+  private list: Container | null = null;
+  private readonly collapsedHeight = 40;
+  private readonly toc: TocEntry[];
+  private readonly onNavigate: (flatIndex: number) => void;
+  public onToggle?: () => void;
+
+  constructor(toc: TocEntry[], width: number, onNavigate: (flatIndex: number) => void) {
+    super();
+    this.width = width;
+    this.toc = toc;
+    this.onNavigate = onNavigate;
+
+    this.header = new Card({
+      width,
+      height: this.collapsedHeight,
+      bg: '#ede4d3',
+      border: '#e8dfd0',
+      radius: 6,
+      label: '文章目录',
+      onClick: () => this.toggle(),
+    });
+    this.headerLabel = new RichText(
+      [{ text: '▸ 文章目录', style: { bold: true, color: '#332f29' } }],
+      {
+        font: '14px Noto Sans SC, sans-serif',
+      },
+    );
+    this.headerLabel.setPosition(12, 11);
+    this.header.add(this.headerLabel);
+    this.add(this.header);
+
+    this.height = this.collapsedHeight;
+  }
+
+  private toggle(): void {
+    this.expanded = !this.expanded;
+    this.headerLabel.setSpans([
+      {
+        text: this.expanded ? '▾ 文章目录' : '▸ 文章目录',
+        style: { bold: true, color: '#332f29' },
+      },
+    ]);
+
+    if (this.expanded) {
+      this.list = new Container();
+      this.list.setPosition(12, this.collapsedHeight + 12);
+      this.add(this.list);
+      const listHeight = layoutTocRows(this.list, this.toc, this.width - 24, this.onNavigate);
+      this.header.height = this.collapsedHeight + 12 + listHeight + 16;
+      this.height = this.header.height;
+    } else if (this.list) {
+      this.remove(this.list);
+      this.list = null;
+      this.header.height = this.collapsedHeight;
+      this.height = this.collapsedHeight;
+    }
+
+    this.onToggle?.();
+    this.scene?.markDirty();
+  }
+
+  public render(_r: IRenderer): void {}
+}
+
+/**
+ * `Markdown` subclass that records each heading's rendered `Entity` in
+ * document order. Zola's `page.toc` (see `templates/page.html`) is built
+ * from the same heading sequence and is exactly two levels deep (top-level
+ * entries plus one flat `children` array — verified: no post in this blog
+ * nests three heading depths), so flattening `toc` in document order and
+ * zipping it against this list gives each TOC entry its on-canvas heading
+ * entity without re-deriving Zola's slugify algorithm.
+ */
+const headingEntitiesByMarkdown = new WeakMap<TrackedMarkdown, Entity[]>();
+
+class TrackedMarkdown extends Markdown {
+  // `Markdown`'s constructor calls `renderToken` synchronously inside
+  // `super()`. Under `useDefineForClassFields` (the default for the ES2022+
+  // target this project builds for), ANY class field declaration on this
+  // class — even a bare `foo!: T` with no initializer — is emitted as
+  // `this.foo = undefined` immediately after `super()` returns, which would
+  // silently wipe out whatever `renderToken` pushed during construction.
+  // Confirmed by reproducing in a real browser: the first heading push
+  // during `super()` succeeded, then reading the field afterward was
+  // `undefined` again. Storing the array in a module-level `WeakMap` keyed
+  // by `this` instead avoids the class-field reset entirely.
+  public get headingEntities(): Entity[] {
+    return headingEntitiesByMarkdown.get(this) ?? [];
+  }
+
+  protected override renderToken(token: Token): Entity | null {
+    const entity = super.renderToken(token);
+    if (entity && token.type === 'heading') {
+      const list = headingEntitiesByMarkdown.get(this) ?? [];
+      list.push(entity);
+      headingEntitiesByMarkdown.set(this, list);
+    }
+    return entity;
+  }
 }
 
 // ─── BlogScrollView: wraps new ScrollView and wakes onDemand scene ───────────
@@ -548,6 +683,7 @@ function renderApp() {
   const page = new PageContainer();
   page.setPosition(originX, currentY + 24); // start 24px lower, slides up
   mainScroll.add(page);
+  let footerContainer: Container | null = null;
 
   const payload = currentPageData.data;
 
@@ -598,7 +734,7 @@ function renderApp() {
 
       itemY += 24;
 
-      const summaryText = new CustomMarkdown(post.summary || post.description || '', {
+      const summaryText = new Markdown(post.summary || post.description || '', {
         maxWidth: contentWidth,
         theme: {
           bodyFont: 'Noto Serif SC, serif',
@@ -609,6 +745,10 @@ function renderApp() {
           quoteBorderColor: '#8c765c',
           quoteTextColor: '#7a7265',
           hrColor: '#e8dfd0',
+          syntaxKeywordColor: '#a6423d',
+          syntaxStringColor: '#4f7942',
+          syntaxCommentColor: '#a39a86',
+          syntaxNumberColor: '#b8860b',
           fontSize: 15,
         },
         onLinkClick: (url: string) => navigateTo(url),
@@ -677,10 +817,32 @@ function renderApp() {
 
     detailY += pageMeta.height + 40;
 
+    const toc: TocEntry[] = payload.toc || [];
+    const showToc = toc.length > 0;
+    // Desktop sidebar needs room beside the centered column: 240px sidebar + 40px gap.
+    const tocSidebarWidth = 240;
+    const showDesktopToc = showToc && !isMobile && originX >= tocSidebarWidth + 40;
+    let mobileToc: MobileToc | null = null;
+
+    // `md` (built below) owns the heading entities a TOC click scrolls to, but
+    // the TOC rows are laid out before it for mobile (matching the pre-SPA
+    // `<details>` position ahead of the article body). Route through a ref
+    // cell rather than reordering construction, since the callback is only
+    // ever invoked later, on click.
+    const navigateToHeading = { fn: (_flatIndex: number) => {} };
+    const onTocNavigate = (flatIndex: number) => navigateToHeading.fn(flatIndex);
+
+    if (showToc && !showDesktopToc) {
+      mobileToc = new MobileToc(toc, contentWidth, onTocNavigate);
+      mobileToc.setPosition(0, detailY);
+      page.add(mobileToc);
+      detailY += mobileToc.height + 24;
+    }
+
     let rawMarkdown = payload.raw_content || '';
     // Strip Zola TOML and YAML frontmatter (handle BOM and whitespace)
     rawMarkdown = rawMarkdown.replace(/^\s*[\uFEFF]?(?:\+\+\+|---)[\s\S]*?(?:\+\+\+|---)\s*/, '');
-    const md = new CustomMarkdown(rawMarkdown, {
+    const md = new TrackedMarkdown(rawMarkdown, {
       maxWidth: contentWidth,
       theme: {
         bodyFont: 'Noto Serif SC, serif',
@@ -692,6 +854,10 @@ function renderApp() {
         quoteBorderColor: '#8c765c',
         quoteTextColor: '#7a7265',
         hrColor: '#e8dfd0',
+        syntaxKeywordColor: '#a6423d',
+        syntaxStringColor: '#4f7942',
+        syntaxCommentColor: '#a39a86',
+        syntaxNumberColor: '#b8860b',
         fontSize: isMobile ? 18 : 22,
       },
       onLinkClick: (url: string) => navigateTo(url),
@@ -699,6 +865,28 @@ function renderApp() {
     md.setPosition(0, detailY);
     page.add(md);
     detailY += md.height + 24;
+
+    if (showDesktopToc) {
+      const sidebar = new TocSidebar(toc, tocSidebarWidth, onTocNavigate);
+      sidebar.setPosition(originX + contentWidth + 40, currentY + 40 + md.y);
+      currentScene.add(sidebar);
+    }
+
+    // `payload.toc` is flattened in document order to build TOC rows (see
+    // layoutTocRows), and headingEntities is recorded in that same document
+    // order by TrackedMarkdown, so a row's flat index names the matching
+    // heading entity directly.
+    navigateToHeading.fn = (flatIndex: number) => {
+      const heading = md.headingEntities[flatIndex];
+      if (!heading || typeof window === 'undefined') return;
+      // The heading's world Y already reflects the current scroll offset
+      // (mainScroll.y === -window.scrollY), so its position in the
+      // document's un-scrolled coordinate space is worldY + current scrollY.
+      const worldY = heading.getWorldTransform().f;
+      const documentY = worldY + window.scrollY;
+      const headerClearance = 100;
+      window.scrollTo({ top: Math.max(0, documentY - headerClearance), behavior: 'smooth' });
+    };
 
     // Prev/Next Navigation
     const navEntity = new Container();
@@ -754,7 +942,7 @@ function renderApp() {
     detailY += backBtn.height + 40;
     page.height = detailY;
 
-    (md as any).onHeightChanged = () => {
+    const reflowBelowMd = () => {
       let nextY = md.y + md.height + 24;
       navEntity.setPosition(0, nextY);
       nextY += 40 + 20;
@@ -762,10 +950,9 @@ function renderApp() {
       nextY += backBtn.height + 40;
 
       page.height = nextY;
-      const f = (page as any)._footer;
-      if (f) {
+      if (footerContainer) {
         const footerY = page.height + 60;
-        f.setPosition(0, footerY);
+        footerContainer.setPosition(0, footerY);
         page.height = footerY + 80;
       }
 
@@ -775,12 +962,19 @@ function renderApp() {
       }
       currentScene?.markDirty();
     };
+    (md as unknown as { onHeightChanged?: () => void }).onHeightChanged = reflowBelowMd;
+
+    if (mobileToc) {
+      mobileToc.onToggle = () => {
+        md.setPosition(0, mobileToc.y + mobileToc.height + 24);
+        reflowBelowMd();
+      };
+    }
   }
 
   // ── Footer ───────────────────────────────────────────────────────────────────
   const footerY = page.height + 60;
-  const footerContainer = new Container();
-  (page as any)._footer = footerContainer;
+  footerContainer = new Container();
   footerContainer.setPosition(0, footerY);
 
   const footerText = new Text(`© ${new Date().getFullYear()} Xuepoo. Crafted in VectoJS.`, {
@@ -915,10 +1109,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   window.addEventListener('popstate', async () => {
-    // Clear image cache on navigation to prevent unbounded memory growth (400MB+)
-    if (typeof (imageCache as any).clear === 'function') {
-      imageCache.clear();
-    }
     await handleUrlRoute(window.location.pathname);
   });
 
