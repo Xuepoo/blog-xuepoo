@@ -178,6 +178,19 @@ class TocSidebar extends Entity {
     this.add(list);
 
     this.height = title.height + 12 + layoutTocRows(list, toc, width, onNavigate);
+
+    // Keeps a drag-selection in the article body from swallowing the TOC.
+    // A native `Selection` covers everything between anchor and focus in DOM
+    // order, and VectoJS projects every text entity as a flat sibling div under
+    // one a11y root. Its ordering pass bands those divs into visual reading
+    // order *per region*, where a region is the nearest `clipChildren`
+    // ancestor — precisely so side-by-side columns stay contiguous DOM runs and
+    // a vertical drag through one cannot cross into the other. Without a region
+    // of its own this sidebar's rows interleave with the body paragraphs they
+    // sit level with, so selecting two body paragraphs also selected all nine
+    // TOC rows ordered between them (measured on the built page). Clipping is
+    // free here: this entity draws nothing and every row fits inside its box.
+    this.clipChildren = true;
   }
   public render(_r: IRenderer): void {}
 }
@@ -885,7 +898,10 @@ function renderApp() {
       const worldY = heading.getWorldTransform().f;
       const documentY = worldY + window.scrollY;
       const headerClearance = 100;
-      window.scrollTo({ top: Math.max(0, documentY - headerClearance), behavior: 'smooth' });
+      window.scrollTo({
+        top: Math.max(0, documentY - headerClearance),
+        behavior: 'smooth',
+      });
     };
 
     // Prev/Next Navigation
@@ -962,7 +978,13 @@ function renderApp() {
       }
       currentScene?.markDirty();
     };
-    (md as unknown as { onHeightChanged?: () => void }).onHeightChanged = reflowBelowMd;
+    // `onLayoutUpdated` is the real hook. This used to assign `onHeightChanged`
+    // through an `as unknown as` cast — a name that exists nowhere in VectoJS, so
+    // the cast silenced the type error and the callback was never invoked. Every
+    // post with an image was laid out against the 16:10 guess forever: nothing
+    // below `md` ever moved, and `document.body.style.height` kept a stale value
+    // so the page under-scrolled.
+    md.onLayoutUpdated = reflowBelowMd;
 
     if (mobileToc) {
       mobileToc.onToggle = () => {

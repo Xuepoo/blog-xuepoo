@@ -6,7 +6,7 @@
       "name": "xuepoo-blog",
       "dependencies": {
         "@vectojs/core": "^1.32.7",
-        "@vectojs/markdown": "^0.18.0",
+        "@vectojs/markdown": "^0.18.1",
         "@vectojs/ui": "^2.15.1",
         "marked": "^18.0.9",
       },
@@ -326,7 +326,7 @@
 
     "@vectojs/layout": ["@vectojs/layout@0.9.0", "", { "dependencies": { "@vectojs/text": "^0.3.0" } }, "sha512-Ol3GAu1oK+CzQ2iJkcPHbcJu+6r4tRLqGB3MwcuEb/XObV31A0DAi8cjMj8YEZMwGVVEMecAFjJ0SiQ4WQD3iQ=="],
 
-    "@vectojs/markdown": ["@vectojs/markdown@0.18.0", "", { "dependencies": { "@vectojs/tex": "^0.1.0", "marked": "^18.0.7" }, "peerDependencies": { "@vectojs/core": ">=1.25.0 <2.0.0", "@vectojs/ui": ">=2.6.0 <3.0.0" } }, "sha512-OmxR9bgPV9jC7SUaqiq7FsCmP8eJ22M0pkszf42I2OuS65JiczBiGolWHqixaPnfqtsnlcquTsAIwoEFCSlFFA=="],
+    "@vectojs/markdown": ["@vectojs/markdown@0.18.1", "", { "dependencies": { "@vectojs/tex": "^0.1.0", "marked": "^18.0.7" }, "peerDependencies": { "@vectojs/core": ">=1.25.0 <2.0.0", "@vectojs/ui": ">=2.6.0 <3.0.0" } }, "sha512-lrT57LU/hM3DW+ThEpwXdPhi2z3OaRJBSkABynLsyR6zkVxRag8HYw1hOl7Nky7qXPWTe7NaIWVhRTnxyBDSCQ=="],
 
     "@vectojs/math": ["@vectojs/math@0.1.1", "", {}, "sha512-zHj+oOVv1ydW5ZBzuakMptsb+qkOsFvY7PXLMm4ZNpB/dJFLyd7EiAzFu3HKJQgq0aq0rYFiExyjhlFVvLqSLw=="],
 
