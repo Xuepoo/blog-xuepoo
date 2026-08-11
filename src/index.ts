@@ -520,6 +520,11 @@ async function renderApp() {
   // fresh mainScroll starts at y = 0 while `window.scrollY` keeps its old
   // value, which would snap the canvas to the top. Restored at the end.
   const prevScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+  const maxScrollY =
+    typeof window !== 'undefined'
+      ? Math.max(1, (document.body.scrollHeight || 0) - window.innerHeight)
+      : 1;
+  const scrollRatio = prevScrollY / maxScrollY;
 
   // Clear existing entities
   const root = (currentScene as any).root;
@@ -1050,7 +1055,11 @@ async function renderApp() {
   // real scrolls.
   if (typeof window !== 'undefined') {
     const maxScroll = Math.max(0, page.height - window.innerHeight);
-    const target = Math.min(prevScrollY, maxScroll);
+    let target = prevScrollY;
+    if (Math.abs(maxScrollY - maxScroll) > 1) {
+      target = scrollRatio * maxScroll;
+    }
+    target = Math.min(target, maxScroll);
     if (Math.abs(window.scrollY - target) > 1) window.scrollTo(0, target);
     mainScroll.y = -window.scrollY;
   }
@@ -1180,8 +1189,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       // own `(resolution: Ndppx)` watch covers real browsers; CDP device
       // emulation switches DPR without firing the media-query change, so
       // resync here as well.
-      if (dprChanged && currentScene) {
-        currentScene.resize(currentScene.width, currentScene.height);
+      if (currentScene) {
+        currentScene.resize(window.innerWidth, window.innerHeight);
       }
       if (resizeAnimationFrameId === null) {
         resizeAnimationFrameId = requestAnimationFrame(() => {
