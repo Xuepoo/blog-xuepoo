@@ -26,6 +26,3 @@ include_content = true
 cdn_base_url = "https://cdn.xuepoo.xyz"
 author = "Xuepoo"
 default_og_image = "/og-default.png"
-anime_title = "薛璞の红白机大厅"
-anime_subtitle = "Stage 1-1: Welcome to NES Retro World"
-custom_cursor_url = "https://cdn.xuepoo.xyz/shared/retro-wand.png"

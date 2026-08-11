@@ -1,3 +1,21 @@
+/* Self-hosted variable subsets (see scripts/subset-fonts.sh) — replaces the
+   20+ unicode-range slices Google Fonts served for CJK text. */
+@font-face {
+  font-family: "Noto Sans SC";
+  src: url("/fonts/noto-sans-sc.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Noto Serif SC";
+  src: url("/fonts/noto-serif-sc.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg-color: #f7f2e8; /* Warm book page cream/rice-yellow */
   --text-color: #332f29; /* Soft charcoal-brown for high readability, low contrast strain */

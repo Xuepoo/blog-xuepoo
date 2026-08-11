@@ -3,7 +3,17 @@
 个人技术博客站点，基于 [Zola](https://www.getzola.org/) 构建，托管于 [Cloudflare Pages](https://pages.cloudflare.com/)。
 
 * **线上地址**：[blog.xuepoo.xyz](https://blog.xuepoo.xyz)
-* **主题设计**：极简禅意温润米黄（Cream Zen）排版风格，无 JS 加载（搜索功能除外），为深度技术阅读设计。
+* **主题设计**：极简禅意温润米黄（Cream Zen）排版风格，**整站由 VectoJS 渲染**（单个 canvas + Scene），为深度技术阅读设计。
+
+## 0. 技术架构
+
+* **静态生成**：[Zola](https://www.getzola.org/) 把每页数据（文章列表 / 全文 Markdown + TOC + 导航）嵌入 `<script id="page-data">` JSON；构建时由 `scripts/obfuscate.ts` 做 XOR+Base64 混淆，防爬虫直接读源码。
+* **前端运行时**：`src/index.ts` 是唯一的 VectoJS 应用（约 1100 行）——单个 `<canvas>` + 一个 Scene，`onDemand` 渲染。SPA 路由（`pushState` + fetch 页面数据 + 整树重建）、原生 body 滚动同步到 canvas、阅读进度条、桌面粘性 TOC / 移动折叠 TOC、`#tag` 搜索、阅读统计（Cloudflare Functions `/api/views`）。
+* **按需加载**：`@vectojs/markdown`（约 380KB，含 katex 依赖）通过 `src/article.ts` 的动态 import 懒加载——列表页完全不拉取；全文搜索索引 `search.json` 在搜索框首次聚焦时才请求。
+* **字体**：自托管子集化 Noto Sans/Serif SC 可变字体（`static/fonts/`，由 `scripts/subset-fonts.sh` 生成），替代 Google Fonts 的 20+ 个 CJK 分片。
+* **无障碍**：正文通过 `getContentProjection()` 投影为逐行 DOM 文本（`src/text-utils.ts` 关闭逐字形 carrier 模式），屏幕阅读器按行阅读；TOC 行投影为可聚焦的 `role: link`。
+* **站内查找**：`Ctrl/Cmd+F` 拦截浏览器原生查找，`src/find.ts` 在画布内高亮全部匹配（精确字形坐标）并支持 Enter/Shift+Enter 循环、Esc 关闭。
+* **构建**：`bun run build`（bundle + 代码分割）→ `zola build` → `bun run obfuscate` → `wrangler pages deploy`，全部由 `just deploy` 串联。
 
 ---
 

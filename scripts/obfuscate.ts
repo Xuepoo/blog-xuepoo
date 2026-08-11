@@ -31,8 +31,10 @@ async function run() {
     let content = await Bun.file(file).text();
     let modified = false;
     // Obfuscate page-data
-    const pageDataRegex =
-      /<script\s+id=["']?page-data["']?\s+type=["']?text\/plain["']?>([\s\S]*?)<\/script>/gi;
+    // Match whatever Zola's minifier left behind: `type` may be
+    // `application/json` (base.html) or `text/plain` (search_json.html), and
+    // minify_html strips the quotes. The id is the only stable handle.
+    const pageDataRegex = /<script\s+id=["']?page-data["']?[^>]*>([\s\S]*?)<\/script>/gi;
     content = content.replace(pageDataRegex, (match, p1) => {
       const trimmed = p1.trim();
       if (!trimmed || trimmed.startsWith('e:')) return match; // Already obfuscated or empty
@@ -41,8 +43,7 @@ async function run() {
     });
 
     // Obfuscate search-data
-    const searchDataRegex =
-      /<script\s+id=["']?search-data["']?\s+type=["']?text\/plain["']?>([\s\S]*?)<\/script>/gi;
+    const searchDataRegex = /<script\s+id=["']?search-data["']?[^>]*>([\s\S]*?)<\/script>/gi;
     content = content.replace(searchDataRegex, (match, p1) => {
       const trimmed = p1.trim();
       if (!trimmed || trimmed.startsWith('e:')) return match; // Already obfuscated or empty

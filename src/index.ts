@@ -1,6 +1,8 @@
 import { Scene, Entity, type IRenderer, type A11yAttributes, VectoJSEvent } from '@vectojs/core';
 import { Text, RichText, Input, Card } from '@vectojs/ui';
-import { Markdown, type Token } from '@vectojs/markdown';
+import { createArticleMarkdown } from './article';
+import { FindController } from './find';
+import { withWholeLineProjection } from './text-utils';
 
 const key = 42;
 
@@ -26,6 +28,24 @@ function parsePageData(raw: string) {
     return null;
   }
 }
+/**
+ * Zola emits summaries/descriptions as plain text (the template runs
+ * `striptags`); strip leftover markdown markers so they render cleanly with a
+ * plain `Text` entity on the list page.
+ */
+function cleanPlainText(text: string): string {
+  return text.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_`~]/g, '');
+}
+
+/** Dismiss the search result dropdown, wherever it is currently attached. */
+function closeSearchDropdown() {
+  if (searchDropdown) {
+    if (searchDropdownHost) searchDropdownHost.remove(searchDropdown);
+    searchDropdown = null;
+    searchDropdownHost = null;
+    currentSearchMatches = [];
+  }
+}
 
 // Global state
 let currentScene: Scene | null = null;
@@ -34,8 +54,36 @@ let searchDatabase: any[] = [];
 let searchDropdown: any = null;
 let currentSearchMatches: any[] = [];
 let viewsMap = new Map<string, number>();
-// Wheel handler attached to the canvas for scroll (Scene does not forward wheel events)
-let _canvasWheelHandler: ((e: WheelEvent) => void) | null = null;
+// Search dropdown host (the header container it is attached to), so a global
+// Ctrl+F can dismiss it.
+let searchDropdownHost: Container | null = null;
+// Native body scrolling hooks attach once — renderApp rebuilds the entity tree
+// on every route change / resize, so the guard must not re-add listeners.
+let scrollListenersAttached = false;
+let searchDatabaseLoaded = false;
+let lastDpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
+
+/** React to a devicePixelRatio change (browser zoom, monitor move, emulation). */
+function handleDprChange() {
+  lastDpr = window.devicePixelRatio;
+  // Force the Scene to re-read the DPR and re-scale the backing store. Its own
+  // `(resolution: Ndppx)` watch covers real browsers, but CDP device emulation
+  // switches DPR without dispatching the media-query change event.
+  if (currentScene) currentScene.resize(currentScene.width, currentScene.height);
+  armDprWatch();
+  void renderPage();
+}
+
+/** Arm a media query for the CURRENT DPR; re-arm after every change. */
+function armDprWatch(): void {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+  if (dprQuery) dprQuery.removeEventListener?.('change', handleDprChange);
+  dprQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+  dprQuery.addEventListener?.('change', handleDprChange);
+}
+
+let dprQuery: MediaQueryList | null = null;
+const findController = new FindController();
 let currentMainScroll: Container | null = null;
 
 class DividerLine extends Entity {
@@ -92,10 +140,12 @@ class TocLinkRow extends Entity {
   ) {
     super();
     this.interactive = true;
-    const label = new RichText([{ text: title, style: { color: '#7a7265' } }], {
-      font: '13px Noto Sans SC, sans-serif',
-      maxWidth: width,
-    });
+    const label = withWholeLineProjection(
+      new RichText([{ text: title, style: { color: '#7a7265' } }], {
+        font: '13px Noto Sans SC, sans-serif',
+        maxWidth: width,
+      }),
+    );
     this.add(label);
     this.width = width;
     this.height = label.height;
@@ -166,10 +216,12 @@ class TocSidebar extends Entity {
     super();
     this.width = width;
 
-    const title = new Text('目录', {
-      font: '600 13px Noto Sans SC, sans-serif',
-      color: '#332f29',
-    });
+    const title = withWholeLineProjection(
+      new Text('目录', {
+        font: '600 13px Noto Sans SC, sans-serif',
+        color: '#332f29',
+      }),
+    );
     this.add(title);
 
     const list = new Container();
@@ -228,11 +280,10 @@ class MobileToc extends Entity {
       label: '文章目录',
       onClick: () => this.toggle(),
     });
-    this.headerLabel = new RichText(
-      [{ text: '▸ 文章目录', style: { bold: true, color: '#332f29' } }],
-      {
+    this.headerLabel = withWholeLineProjection(
+      new RichText([{ text: '▸ 文章目录', style: { bold: true, color: '#332f29' } }], {
         font: '14px Noto Sans SC, sans-serif',
-      },
+      }),
     );
     this.headerLabel.setPosition(12, 11);
     this.header.add(this.headerLabel);
@@ -270,45 +321,6 @@ class MobileToc extends Entity {
 
   public render(_r: IRenderer): void {}
 }
-
-/**
- * `Markdown` subclass that records each heading's rendered `Entity` in
- * document order. Zola's `page.toc` (see `templates/page.html`) is built
- * from the same heading sequence and is exactly two levels deep (top-level
- * entries plus one flat `children` array — verified: no post in this blog
- * nests three heading depths), so flattening `toc` in document order and
- * zipping it against this list gives each TOC entry its on-canvas heading
- * entity without re-deriving Zola's slugify algorithm.
- */
-const headingEntitiesByMarkdown = new WeakMap<TrackedMarkdown, Entity[]>();
-
-class TrackedMarkdown extends Markdown {
-  // `Markdown`'s constructor calls `renderToken` synchronously inside
-  // `super()`. Under `useDefineForClassFields` (the default for the ES2022+
-  // target this project builds for), ANY class field declaration on this
-  // class — even a bare `foo!: T` with no initializer — is emitted as
-  // `this.foo = undefined` immediately after `super()` returns, which would
-  // silently wipe out whatever `renderToken` pushed during construction.
-  // Confirmed by reproducing in a real browser: the first heading push
-  // during `super()` succeeded, then reading the field afterward was
-  // `undefined` again. Storing the array in a module-level `WeakMap` keyed
-  // by `this` instead avoids the class-field reset entirely.
-  public get headingEntities(): Entity[] {
-    return headingEntitiesByMarkdown.get(this) ?? [];
-  }
-
-  protected override renderToken(token: Token): Entity | null {
-    const entity = super.renderToken(token);
-    if (entity && token.type === 'heading') {
-      const list = headingEntitiesByMarkdown.get(this) ?? [];
-      list.push(entity);
-      headingEntitiesByMarkdown.set(this, list);
-    }
-    return entity;
-  }
-}
-
-// ─── BlogScrollView: wraps new ScrollView and wakes onDemand scene ───────────
 
 // ─── Post Card with Hover Highlight (no y-shift to avoid layout overlap) ──────
 
@@ -472,6 +484,8 @@ async function handleUrlRoute(url: string) {
 }
 
 async function initSearchDatabase() {
+  if (searchDatabaseLoaded) return;
+  searchDatabaseLoaded = true;
   try {
     const response = await fetch('/search.json');
     if (response.ok) {
@@ -500,8 +514,12 @@ async function initSearchDatabase() {
 
 // ─── Main Render ──────────────────────────────────────────────────────────────
 
-function renderApp() {
+async function renderApp() {
   if (!currentScene || !currentPageData) return;
+  // Keep the reader's place across rebuilds (resize / zoom / DPR change): the
+  // fresh mainScroll starts at y = 0 while `window.scrollY` keeps its old
+  // value, which would snap the canvas to the top. Restored at the end.
+  const prevScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
 
   // Clear existing entities
   const root = (currentScene as any).root;
@@ -528,6 +546,8 @@ function renderApp() {
 
   const mainScroll = new Container();
   currentMainScroll = mainScroll;
+  findController.attach(currentScene, mainScroll);
+  findController.reset();
 
   // Use a fast tween instead of a spring to prevent elastic bouncing / overshoot,
   // while still smoothing out rigid mouse wheel steps.
@@ -544,9 +564,8 @@ function renderApp() {
 
   currentScene.add(mainScroll);
 
-  if (!_canvasWheelHandler) {
-    _canvasWheelHandler = (_e: Event) => {}; // No-op, just to satisfy the type
-
+  if (!scrollListenersAttached) {
+    scrollListenersAttached = true;
     // Enable native scrolling on body
     document.body.style.overflow = 'auto';
     document.documentElement.style.overflow = 'auto';
@@ -573,13 +592,12 @@ function renderApp() {
   const headerContainer = new Container();
   headerContainer.setPosition(originX, currentY);
 
-  const titleText = new RichText(
-    [{ text: currentPageData.config.title, style: { bold: true, href: '/' } }],
-    {
+  const titleText = withWholeLineProjection(
+    new RichText([{ text: currentPageData.config.title, style: { bold: true, href: '/' } }], {
       font: '600 24px Noto Sans SC, sans-serif',
       color: '#332f29',
       onLinkClick: () => navigateTo('/'),
-    },
+    }),
   );
   headerContainer.add(titleText);
 
@@ -590,10 +608,7 @@ function renderApp() {
     font: '14px Noto Sans SC, sans-serif',
     onChange: (val: string) => {
       const query = val.trim().toLowerCase();
-      if (searchDropdown) {
-        headerContainer.remove(searchDropdown);
-        searchDropdown = null;
-      }
+      closeSearchDropdown();
 
       if (!query) {
         currentScene?.markDirty();
@@ -641,18 +656,21 @@ function renderApp() {
           card.on('click', handleNavigation);
           card.on('pointerup', handleNavigation);
 
-          const cardTitle = new Text(match.title, {
-            font: '12px Noto Sans SC, sans-serif',
-            color: '#332f29',
-            maxWidth: 230,
-          });
+          const cardTitle = withWholeLineProjection(
+            new Text(match.title, {
+              font: '12px Noto Sans SC, sans-serif',
+              color: '#332f29',
+              maxWidth: 230,
+            }),
+          );
           cardTitle.setPosition(10, 8);
           card.add(cardTitle);
-
-          const cardDate = new Text(match.date, {
-            font: '10px Noto Sans SC, sans-serif',
-            color: '#7a7265',
-          });
+          const cardDate = withWholeLineProjection(
+            new Text(match.date, {
+              font: '10px Noto Sans SC, sans-serif',
+              color: '#7a7265',
+            }),
+          );
           cardDate.setPosition(10, 30);
           card.add(cardDate);
 
@@ -661,6 +679,7 @@ function renderApp() {
         }
         headerContainer.add(searchDropdown);
       }
+      searchDropdownHost = headerContainer;
       currentScene?.markDirty();
     },
   });
@@ -670,6 +689,11 @@ function renderApp() {
         navigateTo(currentSearchMatches[0].url);
       }
     }
+  });
+  // Load the search index only when the box is first focused, not on every
+  // page load — search.json is the full-text index and costs a fetch + parse.
+  searchInput.on('focus', () => {
+    void initSearchDatabase();
   });
   if (isMobile) {
     searchInput.setPosition(0, 45);
@@ -704,10 +728,12 @@ function renderApp() {
     let listY = 0;
 
     if (payload.type === 'taxonomy_single') {
-      const heading = new Text(`关于 "${payload.term}" 的所有文章`, {
-        font: '600 20px Noto Sans SC, sans-serif',
-        color: '#332f29',
-      });
+      const heading = withWholeLineProjection(
+        new Text(`关于 "${payload.term}" 的所有文章`, {
+          font: '600 20px Noto Sans SC, sans-serif',
+          color: '#332f29',
+        }),
+      );
       heading.setPosition(0, listY);
       page.add(heading);
       listY += 40;
@@ -719,13 +745,12 @@ function renderApp() {
       const postItem = new AnimatedPostItem(contentWidth);
       postItem.setPosition(0, listY);
 
-      const postTitle = new RichText(
-        [{ text: post.title, style: { bold: true, href: post.url } }],
-        {
+      const postTitle = withWholeLineProjection(
+        new RichText([{ text: post.title, style: { bold: true, href: post.url } }], {
           font: '600 20px Noto Serif SC, serif',
           color: '#332f29',
           onLinkClick: () => navigateTo(post.url),
-        },
+        }),
       );
       postItem.add(postTitle);
 
@@ -737,45 +762,37 @@ function renderApp() {
         metaText += ` · 标签: ${post.tags.map((t: string) => `#${t}`).join(' ')}`;
       }
 
-      const postMeta = new Text(metaText, {
-        font: '13px Noto Sans SC, sans-serif',
-        color: '#7a7265',
-      });
+      const postMeta = withWholeLineProjection(
+        new Text(metaText, {
+          font: '13px Noto Sans SC, sans-serif',
+          color: '#7a7265',
+        }),
+      );
       postMeta.setPosition(0, itemY);
       postItem.add(postMeta);
 
       itemY += 24;
 
-      const summaryText = new Markdown(post.summary || post.description || '', {
-        maxWidth: contentWidth,
-        theme: {
-          bodyFont: 'Noto Serif SC, serif',
-          textColor: '#7a7265',
-          headingColor: '#332f29',
-          codeColor: '#8c765c',
-          codeBgColor: '#ede4d3',
-          quoteBorderColor: '#8c765c',
-          quoteTextColor: '#7a7265',
-          hrColor: '#e8dfd0',
-          syntaxKeywordColor: '#a6423d',
-          syntaxStringColor: '#4f7942',
-          syntaxCommentColor: '#a39a86',
-          syntaxNumberColor: '#b8860b',
-          fontSize: 15,
-        },
-        onLinkClick: (url: string) => navigateTo(url),
-      });
+      // List pages render plain summaries (see `cleanPlainText`), so a full
+      // markdown renderer is unnecessary here — keeping `@vectojs/markdown`
+      // out of the eager bundle saves its ~380KB chunk on the homepage.
+      const summaryText = withWholeLineProjection(
+        new Text(cleanPlainText(post.summary || post.description || ''), {
+          font: '15px Noto Serif SC, serif',
+          color: '#7a7265',
+          maxWidth: contentWidth,
+        }),
+      );
       summaryText.setPosition(0, itemY);
       postItem.add(summaryText);
 
       itemY += summaryText.height + 16;
 
-      const readMore = new RichText(
-        [{ text: '阅读全文 →', style: { color: '#8c765c', href: post.url } }],
-        {
+      const readMore = withWholeLineProjection(
+        new RichText([{ text: '阅读全文 →', style: { color: '#8c765c', href: post.url } }], {
           font: '14px Noto Sans SC, sans-serif',
           onLinkClick: () => navigateTo(post.url),
-        },
+        }),
       );
       readMore.setPosition(0, itemY);
       postItem.add(readMore);
@@ -796,18 +813,20 @@ function renderApp() {
     // ── Post Detail ──────────────────────────────────────────────────────────
     let detailY = 0;
 
-    const pageTitle = new RichText(
-      [
+    const pageTitle = withWholeLineProjection(
+      new RichText(
+        [
+          {
+            text: payload.title || 'Untitled',
+            style: { fontSize: isMobile ? 32 : 44, bold: true },
+          },
+        ],
         {
-          text: payload.title || 'Untitled',
-          style: { fontSize: isMobile ? 32 : 44, bold: true },
+          font: `${isMobile ? 32 : 44}px STKaiti, KaiTi, serif`,
+          color: '#332f29',
+          maxWidth: contentWidth,
         },
-      ],
-      {
-        font: `${isMobile ? 32 : 44}px STKaiti, KaiTi, serif`,
-        color: '#332f29',
-        maxWidth: contentWidth,
-      },
+      ),
     );
     pageTitle.setPosition(0, detailY);
     page.add(pageTitle);
@@ -820,10 +839,12 @@ function renderApp() {
       metaText += ` · 标签: ${payload.tags.map((t: string) => `#${t}`).join(' ')}`;
     }
 
-    const pageMeta = new Text(metaText, {
-      font: '14px Noto Sans SC, sans-serif',
-      color: '#7a7265',
-    });
+    const pageMeta = withWholeLineProjection(
+      new Text(metaText, {
+        font: '14px Noto Sans SC, sans-serif',
+        color: '#7a7265',
+      }),
+    );
     pageMeta.setPosition(0, detailY);
     page.add(pageMeta);
 
@@ -851,11 +872,12 @@ function renderApp() {
       detailY += mobileToc.height + 24;
     }
 
-    let rawMarkdown = payload.raw_content || '';
     // Strip Zola TOML and YAML frontmatter (handle BOM and whitespace)
-    rawMarkdown = rawMarkdown.replace(/^\s*[\uFEFF]?(?:\+\+\+|---)[\s\S]*?(?:\+\+\+|---)\s*/, '');
-    const md = new TrackedMarkdown(rawMarkdown, {
-      maxWidth: contentWidth,
+    const rawMarkdown = (payload.raw_content || '').replace(
+      /^\s*[\uFEFF]?(?:\+\+\+|---)[\s\S]*?(?:\+\+\+|---)\s*/,
+      '',
+    );
+    const md = await createArticleMarkdown(rawMarkdown, {
       theme: {
         bodyFont: 'Noto Serif SC, serif',
         codeFont: 'monospace',
@@ -911,17 +933,19 @@ function renderApp() {
 
     if (payload.navigation?.earlier) {
       const ear = payload.navigation.earlier;
-      const prev = new RichText(
-        [
+      const prev = withWholeLineProjection(
+        new RichText(
+          [
+            {
+              text: `← ${ear.title}`,
+              style: { color: '#8c765c', href: ear.url },
+            },
+          ],
           {
-            text: `← ${ear.title}`,
-            style: { color: '#8c765c', href: ear.url },
+            font: '14px Noto Sans SC, sans-serif',
+            onLinkClick: () => navigateTo(ear.url),
           },
-        ],
-        {
-          font: '14px Noto Sans SC, sans-serif',
-          onLinkClick: () => navigateTo(ear.url),
-        },
+        ),
       );
       prev.setPosition(0, 0);
       navEntity.add(prev);
@@ -929,17 +953,19 @@ function renderApp() {
 
     if (payload.navigation?.later) {
       const lat = payload.navigation.later;
-      const nextText = new RichText(
-        [
+      const nextText = withWholeLineProjection(
+        new RichText(
+          [
+            {
+              text: `${lat.title} →`,
+              style: { color: '#8c765c', href: lat.url },
+            },
+          ],
           {
-            text: `${lat.title} →`,
-            style: { color: '#8c765c', href: lat.url },
+            font: '14px Noto Sans SC, sans-serif',
+            onLinkClick: () => navigateTo(lat.url),
           },
-        ],
-        {
-          font: '14px Noto Sans SC, sans-serif',
-          onLinkClick: () => navigateTo(lat.url),
-        },
+        ),
       );
       nextText.setPosition(contentWidth - nextText.width, 0);
       navEntity.add(nextText);
@@ -949,10 +975,12 @@ function renderApp() {
     detailY += 40;
 
     detailY += 20;
-    const backBtn = new RichText([{ text: '← 返回列表', style: { color: '#8c765c', href: '/' } }], {
-      font: '14px Noto Sans SC, sans-serif',
-      onLinkClick: () => navigateTo('/'),
-    });
+    const backBtn = withWholeLineProjection(
+      new RichText([{ text: '← 返回列表', style: { color: '#8c765c', href: '/' } }], {
+        font: '14px Noto Sans SC, sans-serif',
+        onLinkClick: () => navigateTo('/'),
+      }),
+    );
     backBtn.setPosition(0, detailY);
     page.add(backBtn);
 
@@ -1000,10 +1028,12 @@ function renderApp() {
   footerContainer = new Container();
   footerContainer.setPosition(0, footerY);
 
-  const footerText = new Text(`© ${new Date().getFullYear()} Xuepoo. Crafted in VectoJS.`, {
-    font: '12px Noto Sans SC, sans-serif',
-    color: '#7a7265',
-  });
+  const footerText = withWholeLineProjection(
+    new Text(`© ${new Date().getFullYear()} Xuepoo. Crafted in VectoJS.`, {
+      font: '12px Noto Sans SC, sans-serif',
+      color: '#7a7265',
+    }),
+  );
   footerText.setPosition(0, 0);
   footerContainer.add(footerText);
 
@@ -1014,6 +1044,15 @@ function renderApp() {
   if (typeof document !== 'undefined') {
     document.body.style.height = `${page.height}px`;
     mainScroll.height = page.height;
+  }
+  // Restore the scroll position. `scrollTo` to the same spot fires no scroll
+  // event, so sync `mainScroll.y` manually — the scroll listener only runs on
+  // real scrolls.
+  if (typeof window !== 'undefined') {
+    const maxScroll = Math.max(0, page.height - window.innerHeight);
+    const target = Math.min(prevScrollY, maxScroll);
+    if (Math.abs(window.scrollY - target) > 1) window.scrollTo(0, target);
+    mainScroll.y = -window.scrollY;
   }
 
   currentScene.markDirty();
@@ -1098,9 +1137,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Enter' && searchDropdown && currentSearchMatches.length > 0) {
       navigateTo(currentSearchMatches[0].url);
     }
+    // Intercept the browser's native find box — the page is one canvas, so
+    // find-in-page runs inside the scene instead.
+    const key = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && key === 'f') {
+      e.preventDefault();
+      closeSearchDropdown();
+      findController.open();
+    } else if (key === 'f3') {
+      e.preventDefault();
+      closeSearchDropdown();
+      if (findController.isOpen) findController.next();
+      else findController.open();
+    } else if (key === 'escape' && findController.isOpen) {
+      findController.close();
+    }
   });
-
-  initSearchDatabase();
 
   const dataElement = document.getElementById('page-data');
   if (dataElement) {
@@ -1110,20 +1162,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadViewCounts();
   await logCurrentPageView();
 
-  renderPage();
+  await renderPage();
 
   let lastWidth = window.innerWidth;
   let resizeAnimationFrameId: number | null = null;
   window.addEventListener('resize', () => {
-    // On mobile, scrolling down hides the URL bar, triggering a resize (height change only).
-    // If we rebuild the whole page, it destroys and re-parses all Markdown, leaking memory
-    // and causing severe lag. We ONLY rebuild if the width changed!
-    if (window.innerWidth !== lastWidth) {
+    // On mobile, scrolling down hides the URL bar, triggering a resize (height
+    // change only). Rebuilding then would destroy and re-parse all Markdown,
+    // leaking memory and causing severe lag. Rebuild only when the layout
+    // inputs changed: viewport width or devicePixelRatio (browser zoom).
+    const widthChanged = window.innerWidth !== lastWidth;
+    const dprChanged = window.devicePixelRatio !== lastDpr;
+    if (widthChanged || dprChanged) {
       lastWidth = window.innerWidth;
+      lastDpr = window.devicePixelRatio;
+      // Force the Scene to re-scale the backing store for the new DPR. Its
+      // own `(resolution: Ndppx)` watch covers real browsers; CDP device
+      // emulation switches DPR without firing the media-query change, so
+      // resync here as well.
+      if (dprChanged && currentScene) {
+        currentScene.resize(currentScene.width, currentScene.height);
+      }
       if (resizeAnimationFrameId === null) {
         resizeAnimationFrameId = requestAnimationFrame(() => {
           resizeAnimationFrameId = null;
-          renderPage();
+          void renderPage();
         });
       }
     } else {
@@ -1131,19 +1194,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  armDprWatch();
+  // Backstop for emulated DPR switches that dispatch no events at all: a
+  // one-second poll is negligible next to a rebuild.
+  setInterval(() => {
+    if (window.devicePixelRatio !== lastDpr) handleDprChange();
+  }, 1000);
+
   window.addEventListener('popstate', async () => {
     await handleUrlRoute(window.location.pathname);
   });
 
   if (typeof document !== 'undefined' && (document as any).fonts) {
     (document as any).fonts.ready.then(() => {
-      renderPage();
+      void renderPage();
     });
   }
 });
 
-function renderPage() {
+async function renderPage() {
   if (currentPageData) {
-    renderApp();
+    await renderApp();
   }
 }

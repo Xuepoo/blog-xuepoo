@@ -32,12 +32,6 @@
     <title>{% block title %}{{ config.title }}{% endblock title %}</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600&family=Noto+Sans+SC:wght@300;400&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="/css/page.css" />
 
     {% block extra_head %}{% endblock extra_head %}
@@ -49,14 +43,12 @@
       {
         "config": {
           "title": {{ config.title | json_encode | safe }},
-          "description": {{ config.description | json_encode | safe }},
-          "anime_title": {{ config.extra.anime_title | default(value="") | json_encode | safe }},
-          "anime_subtitle": {{ config.extra.anime_subtitle | default(value="") | json_encode | safe }}
+          "description": {{ config.description | json_encode | safe }}
         },
         "data": {% block page_data %}{}{% endblock %}
       }
     </script>
 
-    <script type="module" src="/js/index.js?v=1.1.0"></script>
+    <script type="module" src="/js/index.js?v={{ now() | date(format='%s') }}"></script>
   </body>
 </html>
