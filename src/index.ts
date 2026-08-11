@@ -62,27 +62,6 @@ let searchDropdownHost: Container | null = null;
 let scrollListenersAttached = false;
 let searchDatabaseLoaded = false;
 let lastDpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
-
-/** React to a devicePixelRatio change (browser zoom, monitor move, emulation). */
-function handleDprChange() {
-  lastDpr = window.devicePixelRatio;
-  // Force the Scene to re-read the DPR and re-scale the backing store. Its own
-  // `(resolution: Ndppx)` watch covers real browsers, but CDP device emulation
-  // switches DPR without dispatching the media-query change event.
-  if (currentScene) currentScene.resize(currentScene.width, currentScene.height);
-  armDprWatch();
-  void renderPage();
-}
-
-/** Arm a media query for the CURRENT DPR; re-arm after every change. */
-function armDprWatch(): void {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-  if (dprQuery) dprQuery.removeEventListener?.('change', handleDprChange);
-  dprQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
-  dprQuery.addEventListener?.('change', handleDprChange);
-}
-
-let dprQuery: MediaQueryList | null = null;
 const findController = new FindController();
 let currentMainScroll: Container | null = null;
 
@@ -598,11 +577,19 @@ async function renderApp() {
   headerContainer.setPosition(originX, currentY);
 
   const titleText = withWholeLineProjection(
-    new RichText([{ text: currentPageData.config.title, style: { bold: true, href: '/' } }], {
-      font: '600 24px Noto Sans SC, sans-serif',
-      color: '#332f29',
-      onLinkClick: () => navigateTo('/'),
-    }),
+    new RichText(
+      [
+        {
+          text: currentPageData.config.title,
+          style: { bold: true, href: '/' },
+        },
+      ],
+      {
+        font: '600 24px Noto Sans SC, sans-serif',
+        color: '#332f29',
+        onLinkClick: () => navigateTo('/'),
+      },
+    ),
   );
   headerContainer.add(titleText);
 
@@ -1203,11 +1190,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  armDprWatch();
-  // Backstop for emulated DPR switches that dispatch no events at all: a
-  // one-second poll is negligible next to a rebuild.
+  // Epsilon-gated polling backstop for CDP device emulation, which switches DPR
+  // without firing any browser events. The gate ignores float jitter (Chrome
+  // reports 1.0999↔1.1000 at 110% zoom), which otherwise triggers infinite rebuilds.
   setInterval(() => {
-    if (window.devicePixelRatio !== lastDpr) handleDprChange();
+    const newDpr = window.devicePixelRatio;
+    if (Math.abs(newDpr - lastDpr) <= 0.001) return;
+    lastDpr = newDpr;
+    if (currentScene) currentScene.resize(window.innerWidth, window.innerHeight);
+    void renderPage();
   }, 1000);
 
   window.addEventListener('popstate', async () => {
