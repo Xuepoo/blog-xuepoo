@@ -724,6 +724,7 @@ async function renderApp() {
         new Text(`关于 "${payload.term}" 的所有文章`, {
           font: '600 20px Noto Sans SC, sans-serif',
           color: '#332f29',
+          maxWidth: contentWidth,
         }),
       );
       heading.setPosition(0, listY);
@@ -741,6 +742,7 @@ async function renderApp() {
         new RichText([{ text: post.title, style: { bold: true, href: post.url } }], {
           font: '600 20px Noto Serif SC, serif',
           color: '#332f29',
+          maxWidth: contentWidth,
           onLinkClick: () => navigateTo(post.url),
         }),
       );
@@ -758,6 +760,7 @@ async function renderApp() {
         new Text(metaText, {
           font: '13px Noto Sans SC, sans-serif',
           color: '#7a7265',
+          maxWidth: contentWidth,
         }),
       );
       postMeta.setPosition(0, itemY);
@@ -835,6 +838,7 @@ async function renderApp() {
       new Text(metaText, {
         font: '14px Noto Sans SC, sans-serif',
         color: '#7a7265',
+        maxWidth: contentWidth,
       }),
     );
     pageMeta.setPosition(0, detailY);
@@ -870,6 +874,7 @@ async function renderApp() {
       '',
     );
     const md = await createArticleMarkdown(rawMarkdown, {
+      maxWidth: contentWidth,
       theme: {
         bodyFont: 'Noto Serif SC, serif',
         codeFont: 'monospace',
@@ -1055,7 +1060,7 @@ async function renderApp() {
   // Force a synchronous render immediately to prevent canvas flickering during window resize.
   // This ensures the canvas pixel buffer is refilled in the same event loop task after
   // Scene.ts clears it via canvas.width = newWidth.
-  currentScene.render((currentScene as any).renderer, 0, performance.now());
+  currentScene.render(currentScene.getRenderer(), 0, performance.now());
 }
 
 // ─── View Tracking ────────────────────────────────────────────────────────────
@@ -1162,33 +1167,50 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let lastWidth = window.innerWidth;
   let resizeAnimationFrameId: number | null = null;
-  window.addEventListener('resize', () => {
-    // On mobile, scrolling down hides the URL bar, triggering a resize (height
-    // change only). Rebuilding then would destroy and re-parse all Markdown,
-    // leaking memory and causing severe lag. Rebuild only when the layout
-    // inputs changed: viewport width or devicePixelRatio (browser zoom).
-    const widthChanged = window.innerWidth !== lastWidth;
-    const dprChanged = window.devicePixelRatio !== lastDpr;
-    if (widthChanged || dprChanged) {
-      lastWidth = window.innerWidth;
-      lastDpr = window.devicePixelRatio;
-      // Force the Scene to re-scale the backing store for the new DPR. Its
-      // own `(resolution: Ndppx)` watch covers real browsers; CDP device
-      // emulation switches DPR without firing the media-query change, so
-      // resync here as well.
-      if (currentScene) {
-        currentScene.resize(window.innerWidth, window.innerHeight);
+
+  // Use ResizeObserver for precise container tracking and Firefox Range recalibration.
+  // ResizeObserver reports contentRect in CSS px, which correctly shrinks on browser
+  // zoom (window.innerWidth also changes, but ResizeObserver is the reliable hook
+  // for scene.resize() — the Firefox Range recalibration hook).
+  const resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const { width, height } = entry.contentRect;
+      const newDpr = window.devicePixelRatio;
+
+      // Width-only: layout must rebuild.
+      // DPR-only (monitor move, emulation): backing store must rescale.
+      // Height-only (mobile URL bar slide): just repaint.
+      const widthChanged = Math.abs(width - lastWidth) > 0.5;
+      const dprChanged = Math.abs(newDpr - lastDpr) > 0.001;
+
+      if (widthChanged || dprChanged) {
+        lastWidth = width;
+        lastDpr = newDpr;
+
+        // Resize the scene with current logical CSS px. This re-reads DPR, rescales
+        // the backing store, and recalibrates Firefox's Range metrics.
+        if (currentScene) {
+          currentScene.resize(width, window.innerHeight);
+          // Synchronous render prevents a black frame while the async rebuild is pending.
+          currentScene.render(currentScene.getRenderer(), 0, performance.now());
+        }
+
+        // Debounce the full layout rebuild into the next rAF
+        if (resizeAnimationFrameId === null) {
+          resizeAnimationFrameId = requestAnimationFrame(() => {
+            resizeAnimationFrameId = null;
+            void renderPage();
+          });
+        }
+      } else {
+        // Height-only change (mobile URL bar): resize backing store but don't rebuild
+        currentScene?.resize(width, height);
+        currentScene?.markDirty();
       }
-      if (resizeAnimationFrameId === null) {
-        resizeAnimationFrameId = requestAnimationFrame(() => {
-          resizeAnimationFrameId = null;
-          void renderPage();
-        });
-      }
-    } else {
-      currentScene?.markDirty();
     }
   });
+
+  resizeObserver.observe(canvas);
 
   // Epsilon-gated polling backstop for CDP device emulation, which switches DPR
   // without firing any browser events. The gate ignores float jitter (Chrome
@@ -1197,7 +1219,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const newDpr = window.devicePixelRatio;
     if (Math.abs(newDpr - lastDpr) <= 0.001) return;
     lastDpr = newDpr;
-    if (currentScene) currentScene.resize(window.innerWidth, window.innerHeight);
+    if (currentScene) {
+      currentScene.resize(window.innerWidth, window.innerHeight);
+      currentScene.render(currentScene.getRenderer(), 0, performance.now());
+    }
     void renderPage();
   }, 1000);
 
