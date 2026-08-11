@@ -1,7 +1,6 @@
 import { Scene, Entity, type IRenderer, type A11yAttributes, VectoJSEvent } from '@vectojs/core';
 import { Text, RichText, Input, Card } from '@vectojs/ui';
-import { Markdown } from '@vectojs/markdown';
-import type { Token } from 'marked';
+import { Markdown, type Token } from '@vectojs/markdown';
 
 const key = 42;
 
@@ -873,6 +872,8 @@ function renderApp() {
         syntaxNumberColor: '#b8860b',
         fontSize: isMobile ? 18 : 22,
       },
+      blockAffordances: true,
+      showCodeLanguage: true,
       onLinkClick: (url: string) => navigateTo(url),
     });
     md.setPosition(0, detailY);
