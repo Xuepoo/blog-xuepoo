@@ -900,6 +900,11 @@ async function renderApp() {
         quoteBorderColor: '#8c765c',
         quoteTextColor: '#7a7265',
         hrColor: '#e8dfd0',
+        // The package defaults (rgba(15,15,25,.4) body, white .08 header) are
+        // tuned for dark themes — on this paper palette they render as the
+        // murky grey slab seen in review. Use the page's own tones instead.
+        tableBgColor: '#f2e8d5',
+        tableHeaderBgColor: '#e3d7c0',
         syntaxKeywordColor: '#a6423d',
         syntaxStringColor: '#4f7942',
         syntaxCommentColor: '#a39a86',
