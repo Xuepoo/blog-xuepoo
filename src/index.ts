@@ -3,6 +3,8 @@ import { Text, RichText, Input, Card } from '@vectojs/ui';
 import { createArticleMarkdown } from './article';
 import { FindController } from './find';
 import { withWholeLineProjection } from './text-utils';
+import { installCanvasContextMenu } from './context-menu';
+import { SelectionToolbar } from './selection-toolbar';
 
 const key = 42;
 
@@ -47,6 +49,13 @@ function closeSearchDropdown() {
   }
 }
 
+/** Focus the header search box: its projected shadow `<input>` carries the
+ * placeholder as an attribute, which is the only stable DOM handle — the
+ * Input entity itself is rebuilt on every renderApp. */
+function focusSearchInput() {
+  document.querySelector<HTMLInputElement>('input[placeholder="搜索文章..."]')?.focus();
+}
+
 // Global state
 let currentScene: Scene | null = null;
 let currentPageData: any = null;
@@ -63,6 +72,12 @@ let scrollListenersAttached = false;
 let searchDatabaseLoaded = false;
 let lastDpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
 const findController = new FindController();
+const selectionToolbar = new SelectionToolbar({
+  openFind: (query) => {
+    closeSearchDropdown();
+    findController.open(query);
+  },
+});
 let currentMainScroll: Container | null = null;
 
 class DividerLine extends Entity {
@@ -1056,6 +1071,10 @@ async function renderApp() {
     mainScroll.y = -window.scrollY;
   }
 
+  // renderApp cleared the scene root — re-mount the selection toolbar so it
+  // survives SPA navigation and resize-driven rebuilds.
+  selectionToolbar.mount(currentScene);
+
   currentScene.markDirty();
   // Force a synchronous render immediately to prevent canvas flickering during window resize.
   // This ensures the canvas pixel buffer is refilled in the same event loop task after
@@ -1133,6 +1152,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   currentScene.start();
   const scene = currentScene;
 
+  // Right-click anywhere: suppress the browser's "Save image as…" canvas menu
+  // and project a scene-native one instead (links / selection / navigation).
+  installCanvasContextMenu(() => currentScene, {
+    navigateTo,
+    focusSearch: focusSearchInput,
+    openFind: (query) => {
+      closeSearchDropdown();
+      findController.open(query);
+    },
+  });
+
   // `?debug` inspection surface: dock the @vectojs/devtools panel and expose
   // the live Scene for headless audits (auditSceneSelection, inspectText…).
   // Lazy chunk — the panel never loads on a normal visit.
@@ -1156,6 +1186,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && searchDropdown && currentSearchMatches.length > 0) {
       navigateTo(currentSearchMatches[0].url);
+    }
+    // "/" focuses the search box unless the user is already typing in one.
+    // Focus is deferred one task: focusing synchronously inside keydown makes
+    // the browser's default-insertion pass land "/" in the freshly focused
+    // input, even with preventDefault().
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const target = e.target as HTMLElement | null;
+      const typing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
+      if (!typing) {
+        e.preventDefault();
+        setTimeout(focusSearchInput, 0);
+        return;
+      }
     }
     // Intercept the browser's native find box — the page is one canvas, so
     // find-in-page runs inside the scene instead.
