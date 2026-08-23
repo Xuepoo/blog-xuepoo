@@ -1131,18 +1131,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   currentScene = new Scene(canvas, { maxFPS: 60 });
   currentScene.renderMode = 'onDemand';
   currentScene.start();
+  const scene = currentScene;
 
   // `?debug` inspection surface: dock the @vectojs/devtools panel and expose
   // the live Scene for headless audits (auditSceneSelection, inspectText…).
   // Lazy chunk — the panel never loads on a normal visit.
   if (typeof location !== 'undefined' && location.search.includes('debug')) {
     void import('@vectojs/devtools').then(({ attachDevtools }) => {
-      attachDevtools(currentScene, {
+      attachDevtools(scene, {
         width: 320,
         refreshInterval: 0,
         defaultTab: 'tree',
       });
-      (window as unknown as { __vectoScene?: Scene }).__vectoScene = currentScene;
+      (window as unknown as { __vectoScene?: Scene }).__vectoScene = scene;
     });
     // Headless model API for automated audits (auditSceneSelection & friends).
     void import('@vectojs/devtools/headless').then((headless) => {
