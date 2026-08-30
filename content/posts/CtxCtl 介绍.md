@@ -1,6 +1,6 @@
 ---
 title: CtxCtl 介绍
-description: 介绍 CtxCtl —— 一个给 coding agent 压缩上下文、byte-stable 的纯 CLI 上下文层，让 agent 少读、读精、命中 prompt cache。
+description: 介绍 CtxCtl —— 一个给 coding agent 压缩上下文、byte-stable 的纯 CLI 上下文层，让 agent 少读、读精、命中 prompt cache。支持 14 种语言、MCP adapter、self-healing symbol lookup 等特性。
 date: 2026-08-13
 slug: ctxctl-jie-shao
 tags:
@@ -95,7 +95,33 @@ Rust edition 2024 的 workspace，分三个 crate：
 
 分层的意义是：`ctx-symbol` 是一个**可复用的引擎 crate**，不只是这个 CLI 的内部实现。将来任何想在自己的工具里做"按符号读源码"的，可以直接依赖它，而不必重写 tree-sitter 那套东西。
 
-CtxCtl 支持 **11 种语言后端**（Rust、Python、TypeScript、JavaScript、Go、Java、C、C++、C#、Ruby、Lua），全部通过 tree-sitter，**零网络依赖**。
+CtxCtl 支持 **14 种语言后端**（Rust、Python、TypeScript、JavaScript、Go、Java、C、C++、C#、Ruby、Lua、PHP、Swift、Kotlin），全部通过 tree-sitter，**零网络依赖**。
+
+### 4. Self-healing symbol lookup（v0.3.0+）
+
+符号查找现在内置**自愈**机制：当精确匹配失败时，自动 fallback 到 ranked suggestions（基于名称相似度、同文件、同模块、类型签名兼容性），并自动返回对应 outline 供 agent 参考。配合 MCP tool `ctxctl_symbol`，agent 不再会因为拼写错误或重构导致的符号丢失而卡死，而是直接拿到候选列表。
+
+```bash
+ctxctl symbol src/main.rs --name runx   # 故意拼错
+# 自动返回 outline + 建议：run、run_async、run_sync 等
+```
+
+### 5. MCP Adapter（可选）
+
+从 v0.3.0 开始，`ctxctl mcp` 提供 stdio MCP server，暴露全部 5 个 tools（`outline`、`symbol`、`read`、`deps`、`exec`），符合 JSON-RPC 2.0。给 MCP-native agent（Cursor、Claude Desktop 等）直连：
+
+```json
+{
+  "mcpServers": {
+    "ctxctl": {
+      "command": "ctxctl",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+CLI 仍然是 canonical interface；MCP 只是适配层，不改变底层行为。
 
 ## 命令一览
 
@@ -106,6 +132,7 @@ CtxCtl 支持 **11 种语言后端**（Rust、Python、TypeScript、JavaScript�
 | `ctxctl read --lines 100-150,200-210` | 原始行范围切片（不走 AST，适合"就想要这几行"） |
 | `ctxctl deps <file>` | 导入/模块依赖图（本地 / 外部 / 忽略） |
 | `ctxctl exec [--keep] "<cmd>"` | 跑命令并压缩输出 |
+| `ctxctl mcp` | MCP stdio server（可选 adapter） |
 
 几个全局 flag：
 
@@ -116,6 +143,20 @@ ctxctl exec "cargo test" --keep "FAILED|passed"   # 只保留匹配关键行的�
 ```
 
 配置优先级：`--config` > `.ctxctl/config.toml`（向上查找）> XDG > 默认值。
+
+## 实测效果（bench 结果）
+
+用脚本化 agent（pi driving deepseek-v4-flash on OpenRouter）跑四个真实任务（三个 51–96 KB 源文件 + 一个 1914 行 build log）：
+
+| Measurement | Result |
+| ----------- | ------ |
+| Native `ctxctl mcp` tools vs built-in read/bash — session cost | **−33%** |
+| Same benchmark — uncached (fully billed) input tokens | −31% |
+| Log-analysis task via `ctxctl exec` | **−84% cost** |
+| Exploring a 96 KB file through outline/symbol slices | −86% uncached input |
+| File outlines vs whole-file reads | 91–95% smaller |
+
+Savings scale inversely with provider prefix-caching quality：models 缓存激进的依然切 uncached input，弱缓存模型（solar-pro4）也省了 47% session cost。Exec 压缩是条件最弱的胜利（~80%+ everywhere）。
 
 ## 和 CarryCtx 的关系
 
@@ -139,12 +180,24 @@ CtxCtl 和 CarryCtx 是我同一套思路的两半，核心信念是：**agent �
 cargo install ctxctl        # 或 npm i -g ctxctl / bun add -g ctxctl
 ```
 
-也在 GitHub Releases（含 `.deb` / `.rpm` / `.apk` / Arch 包）、Homebrew、Scoop、Docker 上有分发。当前版本 0.1.2，Rust 编写，MIT 协议。
+也在 GitHub Releases（含 `.deb` / `.rpm` / `.apk` / Arch 包）、Homebrew、Scoop、Docker 上有分发。当前版本 **0.3.3**，Rust 编写，MIT 协议。
 
 给 agent 装上对应的 skill，它就会优先用切片读代码、压缩命令输出：
 
 ```bash
-npx skills add https://github.com/Xuepoo/ctxctl-skills --skill ctxctl-core -y
+# 列出可用 skills
+npx skills add Xuepoo/ctxctl-skills --list
+
+# 安装核心 skill 给所有检测到的 agent
+npx skills add Xuepoo/ctxctl-skills --all
+
+# 或指定 agent
+npx skills add Xuepoo/ctxctl-skills \
+  --skill ctxctl-core \
+  --agent codex \
+  --agent claude-code \
+  --agent cursor \
+  --agent github-copilot
 ```
 
 `outline` / `symbol` / `read` / `deps` / `exec` 这套工作流，配合 skill，能让 agent 每次任务少烧不少 token，而且跑起来 cache 友好。如果你也在调教 agent 处理大项目，可以一起试试——尤其是那个 `--keep` 的 exec 压缩，处理构建日志是真的好用。
