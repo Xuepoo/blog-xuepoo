@@ -117,13 +117,10 @@ export class FindController {
     return this.bar !== null;
   }
 
-  public open(query?: string): void {
+  public open(): void {
     if (!this.scene) return;
     if (!this.bar) this.buildBar();
     if (this.bar && !this.bar.scene) this.scene.add(this.bar);
-    if (query && this.input) {
-      this.input.value = query;
-    }
     this.runFind(this.input?.value ?? '');
     // Focus the projected shadow input after the a11y layer materializes it.
     requestAnimationFrame(() => {
@@ -186,10 +183,7 @@ export class FindController {
     bar.add(input);
     const makeButton = (glyph: string, x: number, onClick: () => void) => {
       const button = withWholeLineProjection(
-        new Text(glyph, {
-          font: '16px Noto Sans SC, sans-serif',
-          color: '#8c765c',
-        }),
+        new Text(glyph, { font: '16px Noto Sans SC, sans-serif', color: '#8c765c' }),
       );
       button.setPosition(x, 9);
       button.interactive = true;
@@ -197,10 +191,7 @@ export class FindController {
       bar.add(button);
     };
     const counter = withWholeLineProjection(
-      new Text('0/0', {
-        font: '11px Noto Sans SC, sans-serif',
-        color: '#7a7265',
-      }),
+      new Text('0/0', { font: '11px Noto Sans SC, sans-serif', color: '#7a7265' }),
     );
     counter.setPosition(174, 13);
     bar.add(counter);
