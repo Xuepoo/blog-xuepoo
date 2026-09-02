@@ -67,7 +67,15 @@ async function ensureMarkdown(): Promise<TrackedMarkdownCtor> {
   return trackedMarkdownCtor;
 }
 
-/** Lazily import markdown and build a `TrackedMarkdown` for an article body. */
+/**
+ * Lazily import markdown and build a `TrackedMarkdown` for an article body.
+ *
+ * `options` is forwarded verbatim to `new Markdown(raw, options)`, so
+ * `imageResolver` (see `src/capglyph-demo.ts:createCapGlyphImageResolver`)
+ * can be injected here without changing this module's signature — existing
+ * call sites stay compatible. The demo post opts in only when its body
+ * contains `capglyph:` (see `shouldEnableCapGlyphResolver`).
+ */
 export async function createArticleMarkdown(
   raw: string,
   options: Record<string, unknown>,

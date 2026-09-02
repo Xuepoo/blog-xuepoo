@@ -1,6 +1,11 @@
 import { Scene, Entity, type IRenderer, type A11yAttributes, VectoJSEvent } from '@vectojs/core';
 import { Text, RichText, Input, Card } from '@vectojs/ui';
 import { createArticleMarkdown } from './article';
+import {
+  createCapGlyphImageResolver,
+  demoDirectImageA11y,
+  shouldEnableCapGlyphResolver,
+} from './capglyph-demo';
 import { FindController } from './find';
 import { withWholeLineProjection } from './text-utils';
 
@@ -873,6 +878,11 @@ async function renderApp() {
       /^\s*[\uFEFF]?(?:\+\+\+|---)[\s\S]*?(?:\+\+\+|---)\s*/,
       '',
     );
+    // CapGlyph demo: only posts containing `capglyph:` opt into blob/bitmap path — keeps 100% backward compat.
+    const capGlyphResolver = shouldEnableCapGlyphResolver(rawMarkdown)
+      ? createCapGlyphImageResolver()
+      : undefined;
+    if (capGlyphResolver) void demoDirectImageA11y();
     const md = await createArticleMarkdown(rawMarkdown, {
       maxWidth: contentWidth,
       theme: {
@@ -899,6 +909,7 @@ async function renderApp() {
       blockAffordances: true,
       showCodeLanguage: true,
       onLinkClick: (url: string) => navigateTo(url),
+      ...(capGlyphResolver ? { imageResolver: capGlyphResolver } : {}),
     });
     md.setPosition(0, detailY);
     page.add(md);
